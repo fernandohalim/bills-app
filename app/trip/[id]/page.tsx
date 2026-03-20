@@ -157,12 +157,38 @@ export default function TripDetail() {
     );
   }
 
-  const handleShare = () => {
+  const handleShare = async () => {
     if (!trip) return;
+    
+    // 1. compress the data into the long url
     const compressedData = LZString.compressToEncodedURIComponent(JSON.stringify(trip));
-    const shareUrl = `${window.location.origin}/share?d=${compressedData}`;
-    navigator.clipboard.writeText(shareUrl);
-    alert("magic link copied to clipboard! paste it in whatsapp/line to share.");
+    const longUrl = `${window.location.origin}/share?d=${compressedData}`;
+    
+    try {
+      // 2. visually tell the user we are working on it (since the API takes a second)
+      const btn = document.activeElement as HTMLButtonElement;
+      const originalText = btn.innerText;
+      if (btn) btn.innerText = "generating...";
+
+      // 3. silently ping tinyurl's free api
+      const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`);
+      
+      if (response.ok) {
+        const shortUrl = await response.text();
+        navigator.clipboard.writeText(shortUrl);
+        alert(`magic link copied! (${shortUrl})`);
+      } else {
+        throw new Error("shortener failed");
+      }
+
+      if (btn) btn.innerText = originalText;
+
+    } catch (err) {
+      console.error(err);
+      // fallback: if you have no wifi or the api fails, copy the long one anyway
+      navigator.clipboard.writeText(longUrl);
+      alert("magic link copied! (fallback to long link)");
+    }
   };
 
   const handleAddMember = (e: React.FormEvent) => {
