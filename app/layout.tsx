@@ -23,7 +23,6 @@ export const metadata: Metadata = {
   title: "bills app — split expenses easily",
   description: "a minimal, offline-first expense splitter for trips with friends.",
   keywords: ["splitwise alternative", "bill splitter", "travel expenses", "offline app"],
-  authors: [{ name: "fernando halim" }],
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
