@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Member, Expense, ExpenseItem } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
+import { useAlertStore } from "@/store/useAlertStore";
 
 interface ExpenseFormProps {
   members: Member[];
@@ -12,13 +13,13 @@ interface ExpenseFormProps {
 }
 
 const CATEGORIES = [
-  "food & bev",
-  "shopping",
-  "gas",
-  "hotel",
-  "flights",
-  "activities",
-  "other",
+  { value: "food & bev", label: "🍔 food & bev" },
+  { value: "shopping", label: "🛍️ shopping" },
+  { value: "gas", label: "⛽ gas & travel" },
+  { value: "hotel", label: "🏨 hotel & stay" },
+  { value: "flights", label: "✈️ flights" },
+  { value: "activities", label: "🏄 activities" },
+  { value: "other", label: "✨ other" },
 ];
 
 export default function ExpenseForm({
@@ -37,24 +38,13 @@ export default function ExpenseForm({
   const getRawNumber = (formattedValue: string) =>
     parseInt(formattedValue.replace(/,/g, ""), 10) || 0;
 
-  const getMemberColor = (index: number) => {
-    const colors = [
-      "bg-blue-50 text-blue-700 border-blue-200 hover:border-blue-300",
-      "bg-emerald-50 text-emerald-700 border-emerald-200 hover:border-emerald-300",
-      "bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-300",
-      "bg-amber-50 text-amber-700 border-amber-200 hover:border-amber-300",
-      "bg-rose-50 text-rose-700 border-rose-200 hover:border-rose-300",
-      "bg-cyan-50 text-cyan-700 border-cyan-200 hover:border-cyan-300",
-    ];
-    return colors[index % colors.length];
-  };
-
   const [title, setTitle] = useState(initialExpense?.title || "");
   const [amount, setAmount] = useState(
     initialExpense ? formatNumber(initialExpense.totalAmount) : "",
   );
-  const [category, setCategory] = useState(initialExpense?.category || "other"); // <-- NEW
-
+  const [category, setCategory] = useState(
+    initialExpense?.category || "food & bev",
+  );
   const [expenseDate, setExpenseDate] = useState(
     initialExpense?.expenseDate
       ? new Date(initialExpense.expenseDate).toISOString().split("T")[0]
@@ -103,13 +93,11 @@ export default function ExpenseForm({
         )
       : {},
   );
-
   const [items, setItems] = useState<ExpenseItem[]>(
     initialExpense?.items || [
       { id: uuidv4(), name: "", price: 0, assignedTo: [] },
     ],
   );
-
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -161,12 +149,23 @@ export default function ExpenseForm({
     );
   };
 
+  const showAlert = useAlertStore((state) => state.showAlert);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const totalAmountNum = getRawNumber(amount);
 
-    if (!title.trim()) return alert("please enter a title for the expense.");
-    if (totalAmountNum <= 0) return alert("please enter a valid total amount.");
+    if (!title.trim()) {
+      showAlert("what are we paying for? give it a name!", "missing title! 📝");
+      return;
+    }
+    if (totalAmountNum <= 0) {
+      showAlert(
+        "you can't split zero dollars! enter a valid amount.",
+        "hold up! 🛑",
+      );
+      return;
+    }
 
     let finalPaidBy: Record<string, number> = {};
     if (isMultiplePayers) {
@@ -179,14 +178,24 @@ export default function ExpenseForm({
         }
       });
       if (sumPaid !== totalAmountNum) {
-        return alert(
-          `the combined payments (${sumPaid.toLocaleString()}) must exactly equal the total bill (${totalAmountNum.toLocaleString()}).`,
+        showAlert(
+          `the math isn't mathing. payments must equal ${totalAmountNum.toLocaleString()}`,
+          "math error 🧮",
         );
+        return;
       }
-      if (Object.keys(finalPaidBy).length === 0)
-        return alert("please enter who paid what.");
+      if (Object.keys(finalPaidBy).length === 0) {
+        showAlert(
+          "somebody had to pay for this! who was it?",
+          "missing payer! 💳",
+        );
+        return;
+      }
     } else {
-      if (!payerId) return alert("please select who paid.");
+      if (!payerId) {
+        showAlert("select who paid the bill!", "missing payer! 💳");
+        return;
+      }
       finalPaidBy = { [payerId]: totalAmountNum };
     }
 
@@ -194,8 +203,13 @@ export default function ExpenseForm({
     const savedAdjustments: Record<string, number> = {};
 
     if (splitType === "equal") {
-      if (involvedIds.length === 0)
-        return alert("select at least one person to split with.");
+      if (involvedIds.length === 0) {
+        showAlert(
+          "select at least one person to split this with.",
+          "lonely expense! 🧍",
+        );
+        return;
+      }
       const splitAmount = totalAmountNum / involvedIds.length;
       involvedIds.forEach((id) => {
         owedBy[id] = splitAmount;
@@ -204,14 +218,23 @@ export default function ExpenseForm({
       const validItems = items.filter(
         (i) => i.name.trim() !== "" && i.price > 0,
       );
-      if (validItems.length === 0)
-        return alert("please enter at least one valid item with a price.");
-
+      if (validItems.length === 0) {
+        showAlert(
+          "add at least one item with a price to split it exactly.",
+          "no items! 🛒",
+        );
+        return;
+      }
       const unassignedItems = validItems.filter(
         (i) => i.assignedTo.length === 0,
       );
-      if (unassignedItems.length > 0)
-        return alert(`please assign who had the "${unassignedItems[0].name}".`);
+      if (unassignedItems.length > 0) {
+        showAlert(
+          `who had the "${unassignedItems[0].name}"? assign it to someone!`,
+          "unclaimed item! 🕵️",
+        );
+        return;
+      }
 
       const sumOfItems = validItems.reduce((acc, item) => acc + item.price, 0);
       const ratio = totalAmountNum / sumOfItems;
@@ -232,10 +255,13 @@ export default function ExpenseForm({
         }
       });
 
-      if (sumAdjustments > totalAmountNum)
-        return alert(
-          "the extra adjustments cannot be higher than the total bill!",
+      if (sumAdjustments > totalAmountNum) {
+        showAlert(
+          "the extra adjustments can't be higher than the actual bill!",
+          "math error 🧮",
         );
+        return;
+      }
       const remainingToSplit = totalAmountNum - sumAdjustments;
       const splitAmount =
         involvedIds.length > 0 ? remainingToSplit / involvedIds.length : 0;
@@ -246,12 +272,13 @@ export default function ExpenseForm({
       Object.entries(savedAdjustments).forEach(([id, val]) => {
         if (!involvedIds.includes(id)) owedBy[id] = val;
       });
-      if (Object.keys(owedBy).length === 0)
-        return alert("please configure the split.");
+      if (Object.keys(owedBy).length === 0) {
+        showAlert("setup the split amounts before saving!", "empty split! 🍕");
+        return;
+      }
     }
 
     setIsSubmitting(true);
-
     await onSave({
       id: initialExpense?.id || uuidv4(),
       title,
@@ -267,7 +294,7 @@ export default function ExpenseForm({
       settledShares: initialExpense?.settledShares,
       expenseDate: new Date(expenseDate).toISOString(),
       createdAt: initialExpense?.createdAt || new Date().toISOString(),
-      category, // <-- NEW
+      category,
     });
   };
 
@@ -276,67 +303,73 @@ export default function ExpenseForm({
   const difference = currentTotal - itemsSum;
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="p-5 border border-gray-200 rounded-2xl bg-white space-y-5 shadow-sm"
-    >
-      <div className="flex flex-col gap-3 w-full border-b border-gray-100 pb-4">
-        <div className="flex gap-4 w-full">
-          <input
-            type="text"
-            placeholder="what was it? (e.g. dinner)"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-2/3 border-b border-gray-200 py-2 text-sm focus:outline-none focus:border-black bg-transparent min-w-0"
-          />
+    <form onSubmit={handleSubmit} className="flex flex-col gap-8">
+      {/* Hero Inputs */}
+      <div className="flex flex-col gap-5 p-2">
+        <input
+          type="text"
+          placeholder="what was it? (e.g. dinner)"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full text-3xl font-black bg-transparent border-none placeholder:text-stone-300 focus:outline-none text-stone-800 transition-all focus:scale-[1.02] transform origin-left"
+          autoFocus
+        />
+        <div className="flex items-center gap-3">
+          <span className="text-4xl font-black text-stone-300">rp</span>
           <input
             type="text"
             inputMode="numeric"
-            placeholder="total paid"
+            placeholder="0"
             value={amount}
             onChange={handleAmountChange}
-            className="w-1/3 border-b border-gray-200 py-2 text-sm text-right focus:outline-none focus:border-black bg-transparent min-w-0"
+            className="w-full text-5xl font-black bg-transparent border-none placeholder:text-stone-300 focus:outline-none text-emerald-600 transition-all focus:scale-[1.02] transform origin-left"
           />
-        </div>
-        <div className="flex items-center gap-4 mt-1">
-          <div className="flex items-center gap-2 flex-1">
-            <span className="text-xs text-gray-500 w-12">date</span>
-            <input
-              type="date"
-              value={expenseDate}
-              onChange={(e) => setExpenseDate(e.target.value)}
-              className="w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:border-black bg-transparent"
-            />
-          </div>
-          {/* NEW CATEGORY DROPDOWN */}
-          <div className="flex items-center gap-2 flex-1">
-            <span className="text-xs text-gray-500 w-12 text-right">type</span>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:border-black bg-transparent"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
       </div>
 
-      <div className="flex flex-col border-b border-gray-100 pb-4">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs text-gray-500">paid by</span>
+      {/* Meta details */}
+      <div className="flex gap-3">
+        <div className="flex-1 bg-white border-2 border-stone-100 rounded-2xl relative shadow-sm focus-within:border-emerald-400 focus-within:ring-4 focus-within:ring-emerald-100 transition-all">
+          <label className="absolute -top-2.5 left-3 bg-white px-1 text-[10px] font-black text-stone-400 uppercase tracking-widest">
+            date
+          </label>
+          <input
+            type="date"
+            value={expenseDate}
+            onChange={(e) => setExpenseDate(e.target.value)}
+            className="w-full bg-transparent border-none px-4 py-3.5 text-sm font-bold text-stone-700 focus:outline-none"
+          />
+        </div>
+        <div className="flex-1 bg-white border-2 border-stone-100 rounded-2xl relative shadow-sm focus-within:border-emerald-400 focus-within:ring-4 focus-within:ring-emerald-100 transition-all">
+          <label className="absolute -top-2.5 left-3 bg-white px-1 text-[10px] font-black text-stone-400 uppercase tracking-widest">
+            type
+          </label>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full bg-transparent border-none px-4 py-3.5 text-sm font-bold text-stone-700 focus:outline-none appearance-none cursor-pointer"
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Payer Section */}
+      <div className="bg-white rounded-3xl p-5 border-2 border-stone-100 shadow-sm">
+        <div className="flex justify-between items-center mb-4">
+          <span className="text-sm font-black text-stone-800 uppercase tracking-wide">
+            who paid? 💳
+          </span>
           <button
             type="button"
             onClick={() => setIsMultiplePayers(!isMultiplePayers)}
-            className="text-[10px] text-blue-500 hover:text-blue-700 font-medium bg-blue-50 px-2 py-0.5 rounded-md transition-colors"
+            className="text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:text-white bg-emerald-50 hover:bg-emerald-500 px-3 py-1.5 rounded-xl transition-all active:scale-95"
           >
-            {isMultiplePayers
-              ? "switch to single card"
-              : "multiple people paid?"}
+            {isMultiplePayers ? "switch to one person" : "multiple people"}
           </button>
         </div>
 
@@ -344,7 +377,7 @@ export default function ExpenseForm({
           <select
             value={payerId}
             onChange={(e) => setPayerId(e.target.value)}
-            className="bg-gray-50 border border-gray-200 rounded-md py-1.5 px-2 text-xs outline-none focus:border-black w-full"
+            className="w-full bg-stone-50 border-2 border-stone-100 shadow-sm rounded-2xl py-3.5 px-5 text-sm font-bold text-stone-700 focus:outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition-all cursor-pointer appearance-none"
           >
             {members.map((m) => (
               <option key={m.id} value={m.id}>
@@ -353,17 +386,22 @@ export default function ExpenseForm({
             ))}
           </select>
         ) : (
-          <div className="space-y-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
+          <div className="space-y-3">
             {members.map((m) => (
-              <div key={m.id} className="flex justify-between items-center">
-                <span className="text-xs font-medium">{m.name}</span>
+              <div
+                key={m.id}
+                className="flex justify-between items-center bg-stone-50 p-3.5 rounded-2xl border-2 border-stone-100 focus-within:border-emerald-400 focus-within:bg-white transition-all"
+              >
+                <span className="text-sm font-bold text-stone-700">
+                  {m.name}
+                </span>
                 <input
                   type="text"
                   inputMode="numeric"
                   placeholder="0"
                   value={payers[m.id] || ""}
                   onChange={(e) => handlePayerChange(m.id, e.target.value)}
-                  className="w-24 text-right border-b border-gray-200 text-xs focus:outline-none focus:border-black py-1 bg-transparent"
+                  className="w-24 text-right bg-transparent border-b-2 border-stone-200 text-base font-black text-emerald-600 focus:outline-none focus:border-emerald-500 py-1"
                 />
               </div>
             ))}
@@ -371,46 +409,76 @@ export default function ExpenseForm({
         )}
       </div>
 
-      <div className="bg-gray-100 p-1 rounded-lg flex gap-1">
-        <button
-          type="button"
-          onClick={() => setSplitType("equal")}
-          className={`flex-1 py-1.5 text-[11px] rounded-md transition-colors ${splitType === "equal" ? "bg-white shadow-sm font-medium" : "text-gray-500"}`}
-        >
-          split equally
-        </button>
-        <button
-          type="button"
-          onClick={() => setSplitType("exact")}
-          className={`flex-1 py-1.5 text-[11px] rounded-md transition-colors ${splitType === "exact" ? "bg-white shadow-sm font-medium" : "text-gray-500"}`}
-        >
-          by item
-        </button>
-        <button
-          type="button"
-          onClick={() => setSplitType("adjustment")}
-          className={`flex-1 py-1.5 text-[11px] rounded-md transition-colors ${splitType === "adjustment" ? "bg-white shadow-sm font-medium" : "text-gray-500"}`}
-        >
-          custom amounts
-        </button>
-      </div>
+      {/* Split logic */}
+      <div className="flex flex-col gap-5">
+        <span className="text-sm font-black text-stone-800 uppercase tracking-wide px-1">
+          how are we splitting? 🍕
+        </span>
 
-      {(splitType === "equal" || splitType === "adjustment") && (
-        <div className="space-y-3">
-          {members.map((m) => (
-            <div key={m.id} className="flex flex-col py-1">
-              <div className="flex justify-between items-center mb-1 gap-2">
-                <span className="text-sm truncate flex-1">{m.name}</span>
-                <button
-                  type="button"
-                  onClick={() => toggleInvolved(m.id)}
-                  className={`w-5 h-5 shrink-0 rounded-full border flex items-center justify-center transition-colors ${involvedIds.includes(m.id) ? "bg-black border-black text-white" : "border-gray-300"}`}
-                >
-                  {involvedIds.includes(m.id) && (
-                    <span className="text-[10px]">✓</span>
-                  )}
-                </button>
-                {splitType === "adjustment" && (
+        <div className="bg-stone-100 p-1.5 rounded-3xl flex gap-1 relative overflow-hidden">
+          {/* Animated slider background (pseudo element approach via tailwind) */}
+          <div
+            className={`absolute top-1.5 bottom-1.5 w-[32%] bg-white rounded-2xl shadow-sm transition-all duration-300 ease-out ${splitType === "equal" ? "left-[1.5%]" : splitType === "exact" ? "left-[34%]" : "left-[66.5%]"}`}
+          ></div>
+
+          <button
+            type="button"
+            onClick={() => setSplitType("equal")}
+            className={`flex-1 py-3 text-xs z-10 rounded-2xl transition-all active:scale-95 ${splitType === "equal" ? "font-black text-stone-800" : "font-bold text-stone-500 hover:text-stone-700"}`}
+          >
+            equally
+          </button>
+          <button
+            type="button"
+            onClick={() => setSplitType("exact")}
+            className={`flex-1 py-3 text-xs z-10 rounded-2xl transition-all active:scale-95 ${splitType === "exact" ? "font-black text-stone-800" : "font-bold text-stone-500 hover:text-stone-700"}`}
+          >
+            by item
+          </button>
+          <button
+            type="button"
+            onClick={() => setSplitType("adjustment")}
+            className={`flex-1 py-3 text-xs z-10 rounded-2xl transition-all active:scale-95 ${splitType === "adjustment" ? "font-black text-stone-800" : "font-bold text-stone-500 hover:text-stone-700"}`}
+          >
+            custom
+          </button>
+        </div>
+
+        {(splitType === "equal" || splitType === "adjustment") && (
+          <div className="space-y-2.5 animate-in slide-in-from-top-2 duration-300">
+            {members.map((m) => (
+              <div
+                key={m.id}
+                className={`flex items-center justify-between p-3.5 rounded-2xl border-2 transition-all cursor-pointer ${involvedIds.includes(m.id) ? "bg-white border-emerald-400 shadow-sm" : "bg-stone-50 border-stone-100 opacity-60 hover:opacity-100"}`}
+                onClick={() => toggleInvolved(m.id)}
+              >
+                <div className="flex items-center gap-4">
+                  <div
+                    className={`w-6 h-6 shrink-0 rounded-full border-2 flex items-center justify-center transition-all ${involvedIds.includes(m.id) ? "bg-emerald-500 border-emerald-500 text-white scale-110" : "border-stone-300 bg-white"}`}
+                  >
+                    {involvedIds.includes(m.id) && (
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={3}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    )}
+                  </div>
+                  <span
+                    className={`text-sm font-bold ${involvedIds.includes(m.id) ? "text-stone-800" : "text-stone-500"}`}
+                  >
+                    {m.name}
+                  </span>
+                </div>
+                {splitType === "adjustment" && involvedIds.includes(m.id) && (
                   <input
                     type="text"
                     inputMode="numeric"
@@ -419,108 +487,117 @@ export default function ExpenseForm({
                     onChange={(e) =>
                       handleAdjustmentChange(m.id, e.target.value)
                     }
-                    className="w-20 text-right border-b border-gray-200 text-sm focus:outline-none focus:border-black py-1 bg-transparent"
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-20 text-right bg-transparent border-b-2 border-emerald-100 text-sm font-black text-emerald-600 focus:outline-none focus:border-emerald-500 py-1 placeholder:font-bold placeholder:text-emerald-200"
                   />
                 )}
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
 
-      {splitType === "exact" && (
-        <div className="space-y-3">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="p-3 border border-gray-100 rounded-xl bg-gray-50 flex flex-col gap-3 transition-all"
+        {splitType === "exact" && (
+          <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+            {items.map((item) => (
+              <div
+                key={item.id}
+                className="p-4 border-2 border-stone-100 rounded-3xl bg-white shadow-sm flex flex-col gap-4 relative group"
+              >
+                <span className="absolute -top-3 -left-2 text-2xl drop-shadow-sm transition-transform group-hover:scale-110 group-hover:-rotate-12">
+                  📌
+                </span>
+                <div className="flex gap-3 items-center pl-6">
+                  <input
+                    type="text"
+                    placeholder="what is it?"
+                    value={item.name}
+                    onChange={(e) =>
+                      handleItemChange(item.id, "name", e.target.value)
+                    }
+                    className="flex-1 text-sm font-black bg-stone-50 border-2 border-stone-100 rounded-2xl px-4 py-3 focus:outline-none focus:border-emerald-400 focus:bg-white transition-all"
+                  />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="price"
+                    value={item.price ? formatNumber(item.price) : ""}
+                    onChange={(e) =>
+                      handleItemChange(item.id, "price", e.target.value)
+                    }
+                    className="w-24 text-sm font-black text-right bg-stone-50 border-2 border-stone-100 rounded-2xl px-4 py-3 focus:outline-none focus:border-emerald-400 focus:bg-white transition-all text-emerald-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveItem(item.id)}
+                    className="w-10 h-10 flex items-center justify-center rounded-2xl bg-stone-50 text-stone-400 hover:bg-rose-500 hover:text-white active:scale-90 transition-all font-black text-lg"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2 pl-6">
+                  {members.map((m) => {
+                    const isAssigned = item.assignedTo.includes(m.id);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => toggleItemMember(item.id, m.id)}
+                        className={`text-[11px] font-black px-4 py-2 rounded-full transition-all active:scale-90 ${isAssigned ? "bg-stone-800 text-white shadow-md shadow-stone-800/20 translate-y-[-2px]" : "bg-stone-50 text-stone-400 border-2 border-stone-100 hover:bg-stone-200"}`}
+                      >
+                        {m.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={handleAddItem}
+              className="w-full py-4 text-sm font-black text-stone-500 bg-stone-100 hover:bg-emerald-100 hover:text-emerald-700 rounded-[2rem] transition-all active:scale-95 border-2 border-dashed border-stone-300 hover:border-emerald-300"
             >
-              <div className="flex gap-2 items-start">
-                <input
-                  type="text"
-                  placeholder="item name..."
-                  value={item.name}
-                  onChange={(e) =>
-                    handleItemChange(item.id, "name", e.target.value)
-                  }
-                  className="flex-1 text-sm bg-transparent border-b border-gray-200 focus:outline-none focus:border-black py-1"
-                />
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="price"
-                  value={item.price ? formatNumber(item.price) : ""}
-                  onChange={(e) =>
-                    handleItemChange(item.id, "price", e.target.value)
-                  }
-                  className="w-24 text-sm text-right bg-transparent border-b border-gray-200 focus:outline-none focus:border-black py-1"
-                />
-                <button
-                  type="button"
-                  onClick={() => handleRemoveItem(item.id)}
-                  className="text-gray-400 hover:text-red-500 px-1 py-1"
-                >
-                  ×
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {members.map((m, mIdx) => {
-                  const isAssigned = item.assignedTo.includes(m.id);
-                  const colorClass = isAssigned
-                    ? getMemberColor(mIdx)
-                    : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:bg-gray-50";
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => toggleItemMember(item.id, m.id)}
-                      className={`text-[10px] px-2.5 py-1.5 rounded-full border transition-colors font-medium ${colorClass}`}
-                    >
-                      {m.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={handleAddItem}
-            className="w-full py-2 text-xs font-medium text-gray-500 hover:text-black border border-dashed border-gray-200 rounded-xl transition-colors"
-          >
-            + add item
-          </button>
-        </div>
-      )}
+              + add another item
+            </button>
+          </div>
+        )}
 
-      {splitType === "exact" && itemsSum > 0 && difference !== 0 && (
-        <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700 text-center">
-          subtotal is {itemsSum.toLocaleString()}. the{" "}
-          {Math.abs(difference).toLocaleString()}{" "}
-          {difference > 0 ? "tax/service" : "discount"} will be split
-          proportionally.
-        </div>
-      )}
+        {splitType === "exact" && itemsSum > 0 && difference !== 0 && (
+          <div className="p-5 bg-amber-50 border-2 border-amber-100 rounded-3xl text-sm font-bold text-amber-800 flex items-start gap-3 animate-in fade-in slide-in-from-bottom-2">
+            <span className="text-2xl leading-none">💡</span>
+            <p className="leading-tight">
+              subtotal is{" "}
+              <span className="font-black">{itemsSum.toLocaleString()}</span>.
+              the extra{" "}
+              <span className="font-black">
+                {Math.abs(difference).toLocaleString()}
+              </span>{" "}
+              {difference > 0 ? "tax/tip" : "discount"} will be split fairly
+              across the items.
+            </p>
+          </div>
+        )}
+      </div>
 
-      <div className="flex gap-2 pt-2">
+      {/* Action Buttons */}
+      <div className="flex gap-3 mt-6">
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 py-2.5 bg-gray-50 hover:bg-gray-100 rounded-xl text-xs font-medium transition-colors border border-gray-200"
+          className="flex-1 py-4.5 bg-white border-2 border-stone-200 text-stone-500 rounded-2xl text-base font-black hover:bg-stone-50 hover:border-stone-300 transition-all active:scale-95"
         >
-          cancel
+          nah, cancel
         </button>
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex-1 py-2.5 bg-black text-white rounded-xl text-xs font-medium hover:bg-gray-800 transition-colors disabled:bg-gray-400 flex justify-center items-center"
+          className="flex-[2] py-4.5 bg-stone-900 text-white rounded-2xl text-base font-black hover:bg-emerald-600 transition-all shadow-xl shadow-stone-900/20 hover:shadow-emerald-600/30 active:scale-95 disabled:bg-stone-300 disabled:shadow-none flex justify-center items-center"
         >
           {isSubmitting ? (
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
           ) : initialExpense ? (
-            "update"
+            "save changes ✨"
           ) : (
-            "save"
+            "add to tab 🚀"
           )}
         </button>
       </div>

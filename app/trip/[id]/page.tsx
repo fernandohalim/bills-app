@@ -3,16 +3,37 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTripStore } from "@/store/useTripStore";
+import { useAlertStore } from "@/store/useAlertStore";
 import { v4 as uuidv4 } from "uuid";
 import ExpenseForm from "@/components/expense-form";
 import { calculateSettlements } from "@/lib/settlements";
 import { Expense } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 
+const getAvatarColor = (name: string) => {
+  const colors = [
+    "bg-pink-100 text-pink-700 border-pink-200",
+    "bg-purple-100 text-purple-700 border-purple-200",
+    "bg-indigo-100 text-indigo-700 border-indigo-200",
+    "bg-sky-100 text-sky-700 border-sky-200",
+    "bg-teal-100 text-teal-700 border-teal-200",
+    "bg-amber-100 text-amber-700 border-amber-200",
+    "bg-rose-100 text-rose-700 border-rose-200",
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++)
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
+};
+
+const getInitials = (name: string) => name.substring(0, 2).toLowerCase();
+
 export default function TripDetail() {
   const params = useParams();
   const router = useRouter();
   const tripId = params.id as string;
+
+  const { showAlert, showConfirm } = useAlertStore();
 
   const {
     user,
@@ -55,7 +76,6 @@ export default function TripDetail() {
   const [showSettings, setShowSettings] = useState(false);
   const [editTripName, setEditTripName] = useState("");
 
-  // sorting & filtering state
   const [sortBy, setSortBy] = useState<"newest" | "amount_high" | "amount_low">(
     "newest",
   );
@@ -75,7 +95,6 @@ export default function TripDetail() {
       return 0;
     });
 
-  // get unique categories from existing expenses for the filter dropdown
   const usedCategories = Array.from(
     new Set((trip?.expenses || []).map((e) => e.category || "other")),
   );
@@ -86,11 +105,8 @@ export default function TripDetail() {
   const [isLinked, setIsLinked] = useState(false);
 
   useEffect(() => {
-    if (!user || !trip) return;
-    if (isOwner) {
-      setIsLinked(true);
-      return;
-    }
+    if (!user || !trip || isOwner) return;
+
     const checkLink = async () => {
       const { data } = await supabase
         .from("user_trips")
@@ -110,18 +126,21 @@ export default function TripDetail() {
     }
 
     if (isLinked) {
-      // remove from dashboard
       await supabase
         .from("user_trips")
         .delete()
         .match({ user_id: user.id, trip_id: tripId });
       setIsLinked(false);
+      showAlert("removed from your dashboard.", "unlinked 🔗");
     } else {
-      // save to dashboard
       await supabase
         .from("user_trips")
         .insert({ user_id: user.id, trip_id: tripId });
       setIsLinked(true);
+      showAlert(
+        "saved to your dashboard! you can now access it easily.",
+        "linked ✨",
+      );
     }
   };
 
@@ -201,7 +220,7 @@ export default function TripDetail() {
           if (isSettled && primaryPayerId) {
             memberDetails[id].totalPaid += amt;
             memberDetails[id].paidItems.push({
-              title: `✓ settled ${exp.title} directly`,
+              title: `✓ settled ${exp.title}`,
               amount: amt,
             });
             if (memberDetails[primaryPayerId]) {
@@ -279,24 +298,36 @@ export default function TripDetail() {
     });
   }
 
+  const totalTripCost =
+    trip?.expenses.reduce((sum, exp) => sum + exp.totalAmount, 0) || 0;
+
   if (isLoading && !trip) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center p-6">
-        <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-sm text-gray-500">loading trip details...</p>
+      <main className="flex min-h-screen flex-col items-center justify-center p-6 bg-[#fdfbf7]">
+        <div className="relative w-16 h-16 flex items-center justify-center mb-6">
+          <div className="absolute inset-0 border-4 border-emerald-100 rounded-full"></div>
+          <div className="absolute inset-0 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-xl animate-pulse">🐣</span>
+        </div>
+        <p className="text-sm text-stone-500 font-bold tracking-wide">
+          warming up the nest...
+        </p>
       </main>
     );
   }
 
   if (!trip) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center p-6">
-        <p className="text-sm text-gray-500">trip not found.</p>
+      <main className="flex min-h-screen flex-col items-center justify-center p-6 bg-[#fdfbf7]">
+        <div className="text-6xl mb-6 grayscale opacity-50">🪹</div>
+        <p className="text-sm text-stone-500 font-bold">
+          hmm, couldn&apos;t find this trip.
+        </p>
         <button
           onClick={() => router.push("/")}
-          className="mt-4 text-sm text-black underline"
+          className="mt-6 px-6 py-3 bg-white border-2 border-stone-200 rounded-full text-sm text-stone-700 font-bold hover:border-emerald-500 hover:text-emerald-600 hover:-translate-y-1 transition-all shadow-sm"
         >
-          go back home
+          ← head back home
         </button>
       </main>
     );
@@ -305,12 +336,15 @@ export default function TripDetail() {
   const handleShare = () => {
     const url = `${window.location.origin}/trip/${tripId}`;
     navigator.clipboard.writeText(url);
-    alert("trip link copied! anyone with this link can view the details.");
+    showAlert("link copied! send it to the group chat 📱", "copied! ✨");
   };
 
   const handleAddMember = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMemberName.trim()) return;
+    if (!newMemberName.trim()) {
+      showAlert("you need to type a name first!", "whoops 😅");
+      return;
+    }
     addMember(tripId, { id: uuidv4(), name: newMemberName.trim() });
     setNewMemberName("");
   };
@@ -321,27 +355,39 @@ export default function TripDetail() {
         exp.paidBy[memberId] !== undefined ||
         exp.owedBy[memberId] !== undefined,
     );
-    if (isTiedToExpense)
-      return alert(
-        `cannot remove ${memberName}. they are involved in existing expenses. please delete or edit those expenses first.`,
+    if (isTiedToExpense) {
+      showAlert(
+        `can't remove ${memberName} yet, they are part of an expense!`,
+        "nope! 🙅‍♂️",
       );
-    if (confirm(`remove ${memberName} from this trip?`))
-      deleteMember(tripId, memberId);
+      return;
+    }
+
+    showConfirm(
+      `are you sure you want to remove ${memberName} from the trip?`,
+      () => deleteMember(tripId, memberId),
+      "remove friend? 👋",
+      "yes, remove them",
+    );
   };
 
   const handleSaveExpense = async (expense: Expense) => {
     if (editingExpense) await updateExpense(tripId, expense.id, expense);
     else await addExpense(tripId, expense);
-
     setIsAddingExpense(false);
     setEditingExpense(undefined);
   };
 
   const handleDeleteExpense = (expenseId: string) => {
-    if (confirm("delete this expense permanently?")) {
-      deleteExpense(tripId, expenseId);
-      setExpandedExpenseId(null);
-    }
+    showConfirm(
+      "delete this expense permanently? it will recalculate everything.",
+      () => {
+        deleteExpense(tripId, expenseId);
+        setExpandedExpenseId(null);
+      },
+      "delete expense? 🗑️",
+      "yes, delete it",
+    );
   };
 
   const handleRenameTrip = async (e: React.FormEvent) => {
@@ -354,121 +400,92 @@ export default function TripDetail() {
     setShowSettings(false);
   };
 
-  const handleFullTripDelete = async () => {
-    const confirmDelete = window.confirm(
-      "are you sure you want to permanently delete this entire trip and all its expenses? this cannot be undone.",
+  const handleFullTripDelete = () => {
+    showConfirm(
+      "whoa there! are you sure you want to delete this whole trip and all its expenses? this can't be undone.",
+      async () => {
+        await deleteTrip(tripId);
+        router.push("/");
+      },
+      "nuke entire trip? 🧨",
+      "yes, destroy it",
     );
-    if (confirmDelete) {
-      await deleteTrip(tripId);
-      router.push("/");
-    }
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-6 bg-gray-50">
-      <div className="w-full max-w-md bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-        <div className="flex justify-between items-start mb-8">
+    <main className="flex min-h-screen flex-col items-center p-6 bg-[#fdfbf7] pb-32 text-stone-800 font-sans selection:bg-emerald-200 selection:text-emerald-900">
+      <div className="w-full max-w-md relative">
+        {/* top navigation - bouncy buttons */}
+        <div className="flex justify-between items-center mb-6">
           <button
             onClick={() => router.push("/")}
-            className="text-sm text-gray-500 hover:text-black mt-1 shrink-0"
+            className="w-11 h-11 flex items-center justify-center rounded-full bg-white shadow-sm border border-stone-100 text-stone-500 hover:text-emerald-600 hover:scale-110 hover:-translate-y-0.5 active:scale-95 transition-all"
           >
-            ← back
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2.5}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
           </button>
 
-          {/* Polished header with text truncation for long names */}
-          <div className="flex flex-col items-center gap-1 flex-1 text-center px-4 min-w-0">
-            <div className="flex items-center justify-center gap-2 w-full">
-              <h1 className="text-xl font-medium tracking-tight truncate">
-                {trip.name}
-              </h1>
-              {!isOwner && (
-                <span className="shrink-0 text-[10px] bg-blue-50 text-blue-600 px-2 py-1 rounded-md font-medium tracking-wide">
-                  view only
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              {trip.owner_name && (
-                <span className="text-[10px] text-gray-400 truncate">
-                  created by {trip.owner_name}
-                </span>
-              )}
-              <span className="text-gray-300 text-[10px]">•</span>
-
-              {/* THE CLOUD SYNC INDICATOR */}
-              {isSyncing ? (
-                <span className="text-[10px] text-blue-500 flex items-center gap-1">
-                  <div className="w-2 h-2 border-[1.5px] border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                  saving
-                </span>
-              ) : (
-                <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
-                  <svg
-                    className="w-3 h-3"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                  synced
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 mt-1 shrink-0">
+          <div className="flex items-center gap-2">
             {!isOwner && (
               <button
                 onClick={handleToggleBookmark}
-                className={`p-2 rounded-full transition-colors flex items-center justify-center ${
+                className={`w-11 h-11 rounded-full transition-all flex items-center justify-center hover:scale-110 hover:-translate-y-0.5 active:scale-95 ${
                   isLinked
-                    ? "text-blue-600 bg-blue-50 hover:bg-blue-100"
-                    : "text-gray-400 bg-gray-50 hover:text-gray-900 hover:bg-gray-100"
+                    ? "text-emerald-600 bg-emerald-100 border border-emerald-200"
+                    : "text-stone-400 bg-white border border-stone-100 shadow-sm"
                 }`}
-                title={isLinked ? "remove from dashboard" : "save to dashboard"}
               >
-                {isLinked ? (
-                  /* filled bookmark */
-                  <svg
-                    className="w-5 h-5"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" />
-                  </svg>
-                ) : (
-                  /* outline bookmark */
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-                    />
-                  </svg>
-                )}
+                <svg
+                  className="w-5 h-5"
+                  fill={isLinked ? "currentColor" : "none"}
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                  />
+                </svg>
               </button>
             )}
+            <button
+              onClick={handleShare}
+              className="w-11 h-11 flex items-center justify-center rounded-full bg-white border border-stone-100 shadow-sm text-stone-400 hover:text-emerald-600 hover:scale-110 hover:-translate-y-0.5 active:scale-95 transition-all"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                />
+              </svg>
+            </button>
             {isOwner && (
               <button
                 onClick={() => {
                   setEditTripName(trip.name);
                   setShowSettings(true);
                 }}
-                className="text-gray-400 hover:text-gray-900 transition-colors"
-                title="trip settings"
+                className="w-11 h-11 flex items-center justify-center rounded-full bg-white border border-stone-100 shadow-sm text-stone-400 hover:text-emerald-600 hover:scale-110 hover:-translate-y-0.5 active:scale-95 transition-all"
               >
                 <svg
                   className="w-5 h-5"
@@ -479,95 +496,128 @@ export default function TripDetail() {
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={1.5}
+                    strokeWidth={2}
                     d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
                   />
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={1.5}
+                    strokeWidth={2}
                     d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                   />
                 </svg>
               </button>
             )}
-            <button
-              onClick={handleShare}
-              className="text-sm text-blue-500 font-medium hover:text-blue-700"
-            >
-              share
-            </button>
           </div>
         </div>
 
-        <section className="mb-8">
-          <h2 className="text-sm font-medium text-gray-400 mb-3">members</h2>
+        {/* super playful dynamic hero dashboard */}
+        <div className="bg-emerald-700 text-white rounded-[2.5rem] p-8 shadow-xl shadow-emerald-900/15 mb-10 flex flex-col items-center text-center relative overflow-hidden group">
+          {/* animated background blobs */}
+          <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/30 rounded-full blur-3xl -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-700"></div>
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-emerald-400/20 rounded-full blur-2xl -ml-10 -mb-10 group-hover:translate-x-4 transition-transform duration-700"></div>
+
+          <div className="px-4 py-1.5 bg-white/10 backdrop-blur-md rounded-full text-xs font-bold tracking-widest uppercase mb-4 relative z-10 border border-white/20">
+            {trip.status === "finished" ? "🔒 vault locked" : "💸 active tab"}
+          </div>
+
+          <h1 className="text-3xl font-extrabold tracking-tight mb-2 relative z-10">
+            {trip.name}
+          </h1>
+
+          <div className="text-5xl font-black tracking-tighter relative z-10 my-2 drop-shadow-md">
+            <span className="text-2xl text-emerald-200 align-top mr-1">rp</span>
+            {totalTripCost.toLocaleString()}
+          </div>
+
+          <div className="flex items-center gap-2 mt-6 bg-black/25 px-5 py-2 rounded-full text-xs font-bold text-emerald-50 backdrop-blur-sm relative z-10 shadow-inner">
+            {isSyncing ? (
+              <>
+                <div className="w-3 h-3 border-2 border-emerald-300 border-t-transparent rounded-full animate-spin"></div>{" "}
+                syncing magically ✨
+              </>
+            ) : (
+              <>
+                <div className="w-2 h-2 bg-emerald-400 rounded-full shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse"></div>{" "}
+                safely saved in cloud
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* cute crew section with colorful pills */}
+        <section className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
+          <div className="flex justify-between items-end mb-4 px-1">
+            <h2 className="text-xl font-extrabold text-stone-800">
+              the crew 🤘
+            </h2>
+            <span className="text-sm font-bold text-stone-400 bg-stone-100 px-3 py-1 rounded-full">
+              {trip.members.length}
+            </span>
+          </div>
+
           <div className="flex flex-wrap gap-2 mb-3">
-            {trip.members.map((member) => (
-              <div
-                key={member.id}
-                className={`pl-3 ${!isOwner || trip.status === "finished" ? "pr-3" : "pr-1"} py-1 bg-gray-100 rounded-full text-xs flex items-center gap-1`}
-              >
-                {member.name}
-                {isOwner && trip.status !== "finished" && (
-                  <button
-                    onClick={() => handleRemoveMember(member.id, member.name)}
-                    className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-black hover:bg-gray-200 rounded-full transition-colors"
+            {trip.members.map((member) => {
+              const colorClass = getAvatarColor(member.name);
+              return (
+                <div
+                  key={member.id}
+                  className="pl-1.5 pr-3 py-1.5 bg-white border-2 border-stone-100 shadow-sm rounded-full text-sm font-bold flex items-center gap-2 hover:-translate-y-1 hover:shadow-md hover:border-stone-200 transition-all cursor-default"
+                >
+                  <div
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black border ${colorClass}`}
                   >
-                    ×
-                  </button>
-                )}
-              </div>
-            ))}
+                    {getInitials(member.name)}
+                  </div>
+                  <span className="text-stone-700">{member.name}</span>
+                  {isOwner && trip.status !== "finished" && (
+                    <button
+                      onClick={() => handleRemoveMember(member.id, member.name)}
+                      className="w-6 h-6 flex items-center justify-center text-stone-300 hover:text-white hover:bg-rose-500 rounded-full transition-all active:scale-90 ml-1"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {isOwner && trip.status !== "finished" && (
-            <form onSubmit={handleAddMember} className="flex gap-2">
+            <form onSubmit={handleAddMember} className="flex gap-2 mt-5">
               <input
                 type="text"
                 value={newMemberName}
                 onChange={(e) => setNewMemberName(e.target.value)}
-                placeholder="add a friend..."
-                className="flex-1 border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-black"
+                placeholder="type a name..."
+                className="flex-1 bg-white border-2 border-stone-100 shadow-sm rounded-2xl px-5 py-3.5 text-sm font-bold focus:outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition-all placeholder:font-medium placeholder:text-stone-300"
               />
               <button
                 type="submit"
-                className="px-4 py-2 bg-black text-white rounded-md text-sm font-medium"
+                className="px-6 py-3.5 bg-stone-900 text-white hover:bg-emerald-600 rounded-2xl text-sm font-bold transition-all shadow-md active:scale-95"
               >
-                add
+                add +
               </button>
             </form>
           )}
         </section>
 
-        <section>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-sm font-medium text-gray-400">expenses</h2>
-            {isOwner &&
-              !isAddingExpense &&
-              !editingExpense &&
-              trip.status !== "finished" && (
-                <button
-                  onClick={() => {
-                    if (trip.members.length === 0)
-                      return alert("add a member first!");
-                    setIsAddingExpense(true);
-                  }}
-                  className="text-xs px-3 py-1 bg-black text-white rounded-full"
-                >
-                  + new
-                </button>
-              )}
+        {/* expenses section */}
+        <section className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
+          <div className="flex justify-between items-end mb-4 px-1">
+            <h2 className="text-xl font-extrabold text-stone-800">
+              the tab 🧾
+            </h2>
           </div>
 
-          {trip.expenses.length > 0 && !isAddingExpense && !editingExpense && (
-            <div className="flex gap-2 mb-4">
+          {trip.expenses.length > 0 && (
+            <div className="flex gap-2 mb-5">
               <select
                 value={filterCategory}
                 onChange={(e) => setFilterCategory(e.target.value)}
-                className="text-xs border border-gray-200 bg-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-black flex-1"
+                className="text-sm border-2 border-stone-100 shadow-sm bg-white rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 flex-1 font-bold text-stone-600 transition-all appearance-none cursor-pointer"
               >
-                <option value="all">all types</option>
+                <option value="all">all categories</option>
                 {usedCategories.map((c) => (
                   <option key={c} value={c}>
                     {c}
@@ -581,96 +631,98 @@ export default function TripDetail() {
                     e.target.value as "newest" | "amount_high" | "amount_low",
                   )
                 }
-                className="text-xs border border-gray-200 bg-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-black flex-1"
+                className="text-sm border-2 border-stone-100 shadow-sm bg-white rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 flex-1 font-bold text-stone-600 transition-all appearance-none cursor-pointer"
               >
-                <option value="newest">newest first</option>
-                <option value="amount_high">highest amount</option>
-                <option value="amount_low">lowest amount</option>
+                <option value="newest">latest first</option>
+                <option value="amount_high">highest $$</option>
+                <option value="amount_low">lowest $$</option>
               </select>
             </div>
           )}
 
-          {(isAddingExpense || editingExpense) && isOwner && (
-            <div className="mb-6">
-              <ExpenseForm
-                members={trip.members}
-                initialExpense={editingExpense}
-                onSave={handleSaveExpense}
-                onCancel={() => {
-                  setIsAddingExpense(false);
-                  setEditingExpense(undefined);
-                }}
-              />
-            </div>
-          )}
-
-          <div className="space-y-3">
-            {processedExpenses.length === 0 &&
-            !isAddingExpense &&
-            !editingExpense ? (
-              <div className="text-center py-8 border border-dashed border-gray-200 rounded-lg">
-                <span className="text-xs text-gray-400">no expenses yet.</span>
+          <div className="space-y-4">
+            {processedExpenses.length === 0 ? (
+              <div className="text-center py-16 bg-white rounded-[2rem] shadow-sm border-2 border-dashed border-stone-200">
+                <div className="text-5xl mb-4 animate-bounce inline-block">
+                  🍔
+                </div>
+                <h3 className="text-lg font-extrabold text-stone-800 mb-1">
+                  tab is empty!
+                </h3>
+                <span className="text-sm font-bold text-stone-400">
+                  add the first expense to get started.
+                </span>
               </div>
             ) : (
               processedExpenses.map((exp) => {
                 const payersEntries = Object.entries(exp.paidBy);
                 const isMultiPayer = payersEntries.length > 1;
-
                 const payerDisplay = isMultiPayer
                   ? payersEntries
-                      .map(
-                        ([id, amt]) =>
-                          `${getMemberName(id)} ${amt.toLocaleString()}`,
-                      )
+                      .map(([id]) => `${getMemberName(id)}`)
                       .join(", ")
                   : getMemberName(payersEntries[0][0]);
-
                 const isExpanded = expandedExpenseId === exp.id;
-                const involvedCount = Object.keys(exp.owedBy).length;
 
                 return (
                   <div
                     key={exp.id}
-                    className="border border-gray-100 rounded-xl bg-gray-50 overflow-hidden transition-all"
+                    className="bg-white rounded-[1.5rem] shadow-sm border-2 border-stone-100 overflow-hidden group hover:border-emerald-200 hover:shadow-md transition-all duration-300"
                   >
                     <button
                       onClick={() =>
                         setExpandedExpenseId(isExpanded ? null : exp.id)
                       }
-                      className="w-full flex justify-between items-center p-3 text-left"
+                      className="w-full flex justify-between items-center p-5 text-left active:bg-stone-50 transition-colors"
                     >
                       <div className="flex-1 min-w-0 pr-4">
-                        <p className="text-sm font-medium truncate">
-                          {exp.title}
-                        </p>
-                        <span className="text-[9px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-md font-medium tracking-wide">
-                          {exp.category || "other"}
-                        </span>
-                        <p className="text-xs text-gray-500 truncate">
-                          paid by {payerDisplay}
-                        </p>
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <p className="text-lg font-extrabold text-stone-800 truncate">
+                            {exp.title}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm font-bold text-stone-400 truncate">
+                          <span className="px-2 py-0.5 bg-stone-100 text-stone-500 rounded-md text-[10px] tracking-widest uppercase">
+                            {exp.category || "other"}
+                          </span>
+                          <span>
+                            • paid by{" "}
+                            <span className="text-stone-700">
+                              {payerDisplay}
+                            </span>
+                          </span>
+                        </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-sm font-medium">
+                        <p className="text-xl font-black text-emerald-600">
                           {exp.totalAmount.toLocaleString()}
                         </p>
-                        <p className="text-xs text-gray-400">
-                          {exp.splitType === "exact"
-                            ? "itemized"
-                            : exp.splitType === "adjustment"
-                              ? "adjusted"
-                              : `split by ${involvedCount}`}{" "}
-                          • {isExpanded ? "↑" : "↓"}
+                        <p className="text-xs font-bold text-stone-400 mt-1 flex items-center justify-end gap-1">
+                          {isExpanded ? "close" : "details"}
+                          <span
+                            className={`w-5 h-5 flex items-center justify-center bg-stone-100 rounded-full transition-transform duration-300 ${isExpanded ? "rotate-180 bg-emerald-100 text-emerald-600" : ""}`}
+                          >
+                            <svg
+                              className="w-3 h-3"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth={3}
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M19 9l-7 7-7-7"
+                              />
+                            </svg>
+                          </span>
                         </p>
                       </div>
                     </button>
 
                     {isExpanded && (
-                      <div className="p-3 border-t border-gray-100 bg-white">
-                        <p className="text-xs text-gray-400 mb-3 font-medium">
-                          split details:
-                        </p>
-                        <div className="space-y-4 mb-4">
+                      <div className="p-5 border-t-2 border-stone-100 bg-stone-50/50 animate-in slide-in-from-top-2 duration-200">
+                        <div className="space-y-3 mb-6">
                           {Object.entries(exp.owedBy).map(
                             ([memberId, amount]) => {
                               const isPayer = payersEntries.some(
@@ -681,103 +733,65 @@ export default function TripDetail() {
                                 isOwner &&
                                 !isMultiPayer &&
                                 trip.status !== "finished";
-
                               const isSettled =
                                 exp.settledShares?.[memberId] || false;
                               const extra = exp.adjustments?.[memberId];
 
-                              const consumedItems: string[] = [];
-                              let originalAmount: number | undefined =
-                                undefined;
-
-                              if (exp.splitType === "exact" && exp.items) {
-                                originalAmount = 0;
-                                exp.items.forEach((item) => {
-                                  if (item.assignedTo.includes(memberId)) {
-                                    originalAmount! +=
-                                      item.price / item.assignedTo.length;
-                                    const shareBadge =
-                                      item.assignedTo.length > 1
-                                        ? `(1/${item.assignedTo.length})`
-                                        : "";
-                                    consumedItems.push(
-                                      `${item.name} ${shareBadge}`.trim(),
-                                    );
-                                  }
-                                });
-                              }
-
-                              const hasAdjustment =
-                                originalAmount !== undefined &&
-                                Math.round(originalAmount) !==
-                                  Math.round(amount);
-
                               return (
                                 <div
                                   key={memberId}
-                                  className="flex justify-between text-xs items-start"
+                                  className="flex justify-between items-center bg-white p-3.5 rounded-2xl shadow-sm border border-stone-100 hover:shadow-md transition-shadow"
                                 >
-                                  <div className="flex flex-col">
-                                    <span
-                                      className={`font-medium ${isSettled ? "text-gray-400" : "text-gray-800"}`}
+                                  <div className="flex items-center gap-3">
+                                    <div
+                                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border ${getAvatarColor(getMemberName(memberId))}`}
                                     >
-                                      {getMemberName(memberId)}
-                                    </span>
-
-                                    {consumedItems.length > 0 && (
-                                      <div className="flex flex-col mt-1 space-y-0.5">
-                                        {consumedItems.map((cItem, idx) => (
-                                          <span
-                                            key={idx}
-                                            className="text-[10px] text-gray-500 flex items-center gap-1.5"
-                                          >
-                                            <span className="w-1 h-1 bg-gray-300 rounded-full"></span>{" "}
-                                            {cItem}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
-
-                                    {extra ? (
-                                      <span className="text-gray-400 mt-0.5">
-                                        + {extra.toLocaleString()} extra
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                  <div className="flex flex-col items-end">
-                                    <div className="flex items-center gap-2">
-                                      {canMarkPaid ? (
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            toggleExpenseSettled(
-                                              tripId,
-                                              exp.id,
-                                              memberId,
-                                            );
-                                          }}
-                                          className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${isSettled ? "bg-green-50 text-green-700 border-green-200" : "bg-white text-gray-400 border-gray-200 hover:bg-gray-50 hover:text-black hover:border-black"}`}
-                                        >
-                                          {isSettled ? "paid ✓" : "mark paid"}
-                                        </button>
-                                      ) : (
-                                        isSettled && (
-                                          <span className="text-[10px] px-2 py-0.5 bg-green-50 text-green-700 rounded border border-green-200">
-                                            paid ✓
-                                          </span>
-                                        )
-                                      )}
-                                      <span
-                                        className={`font-medium ${isSettled ? "text-gray-400 line-through" : ""}`}
-                                      >
-                                        {Math.round(amount).toLocaleString()}
-                                      </span>
+                                      {getInitials(getMemberName(memberId))}
                                     </div>
-                                    {hasAdjustment && (
-                                      <span className="text-[10px] text-gray-400 line-through mt-0.5">
-                                        {originalAmount!.toLocaleString()}
+                                    <div className="flex flex-col">
+                                      <span
+                                        className={`text-sm font-extrabold ${isSettled ? "text-stone-400" : "text-stone-800"}`}
+                                      >
+                                        {getMemberName(memberId)}
                                       </span>
+                                      {extra ? (
+                                        <span className="text-[10px] text-stone-400 font-bold tracking-wide">
+                                          +{extra.toLocaleString()} extra
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    {canMarkPaid ? (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          toggleExpenseSettled(
+                                            tripId,
+                                            exp.id,
+                                            memberId,
+                                          );
+                                        }}
+                                        className={`text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors ${
+                                          isSettled
+                                            ? "bg-emerald-50 text-emerald-600 hover:bg-rose-50 hover:text-rose-600"
+                                            : "bg-stone-100 text-stone-600 hover:bg-emerald-100 hover:text-emerald-700"
+                                        }`}
+                                      >
+                                        {isSettled ? "paid ✓" : "mark paid"}
+                                      </button>
+                                    ) : (
+                                      isSettled && (
+                                        <span className="text-[11px] font-bold px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
+                                          paid ✓
+                                        </span>
+                                      )
                                     )}
+                                    <span
+                                      className={`font-black text-lg ${isSettled ? "text-stone-300 line-through decoration-2" : "text-stone-800"}`}
+                                    >
+                                      {Math.round(amount).toLocaleString()}
+                                    </span>
                                   </div>
                                 </div>
                               );
@@ -786,21 +800,22 @@ export default function TripDetail() {
                         </div>
 
                         {isOwner && trip.status !== "finished" && (
-                          <div className="flex gap-2 border-t border-gray-50 pt-3">
+                          <div className="flex gap-3">
                             <button
                               onClick={() => {
                                 setEditingExpense(exp);
                                 setExpandedExpenseId(null);
+                                setIsAddingExpense(true);
                               }}
-                              className="flex-1 text-xs py-1.5 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                              className="flex-1 text-sm font-bold py-3 bg-white border-2 border-stone-200 text-stone-700 hover:border-stone-800 hover:bg-stone-800 hover:text-white rounded-2xl transition-all active:scale-95 shadow-sm"
                             >
-                              edit
+                              ✏️ edit
                             </button>
                             <button
                               onClick={() => handleDeleteExpense(exp.id)}
-                              className="flex-1 text-xs py-1.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
+                              className="flex-1 text-sm font-bold py-3 bg-white border-2 border-rose-100 text-rose-500 hover:border-rose-500 hover:bg-rose-500 hover:text-white rounded-2xl transition-all active:scale-95 shadow-sm"
                             >
-                              delete
+                              🗑️ delete
                             </button>
                           </div>
                         )}
@@ -813,231 +828,218 @@ export default function TripDetail() {
           </div>
         </section>
 
+        {/* settlements ledger */}
         {trip.expenses.length > 0 && (
-          <section className="mt-8 pt-6 border-t border-gray-100">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-sm font-medium text-gray-400">
-                transparent ledger
+          <section className="mt-14 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300">
+            <div className="flex justify-between items-end mb-4 px-1">
+              <h2 className="text-xl font-extrabold text-stone-800">
+                who pays who 🤝
               </h2>
-              <button
-                onClick={() => setShowLedger(!showLedger)}
-                className="text-[10px] px-3 py-1.5 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors font-medium"
-              >
-                {showLedger ? "hide details" : "show details"}
-              </button>
             </div>
 
-            {showLedger && (
-              <div className="space-y-4">
-                {trip.members.map((member) => {
-                  const details = memberDetails[member.id];
-                  if (
-                    !details ||
-                    (details.totalPaid === 0 && details.totalOwed === 0)
-                  )
-                    return null;
-                  const net = Math.round(details.totalPaid - details.totalOwed);
-
-                  return (
-                    <div
-                      key={member.id}
-                      className="p-4 border border-gray-200 rounded-xl bg-white flex flex-col gap-3 shadow-sm"
-                    >
-                      <div className="flex justify-between items-center border-b border-gray-50 pb-3">
-                        <span className="font-medium text-sm">
-                          {member.name}
-                        </span>
-                        <span
-                          className={`text-xs font-medium px-2 py-1 rounded-md ${net > 0 ? "bg-green-50 text-green-700" : net < 0 ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-600"}`}
-                        >
-                          {net > 0
-                            ? "gets back "
-                            : net < 0
-                              ? "owes "
-                              : "settled "}
-                          {Math.abs(net).toLocaleString()}
-                        </span>
-                      </div>
-
-                      <div className="flex flex-col gap-1 text-xs">
-                        <span className="text-gray-400 mb-1">
-                          payments made:
-                        </span>
-                        {details.paidItems.length === 0 ? (
-                          <span className="text-gray-300 italic">-</span>
-                        ) : (
-                          details.paidItems.map((item, i) => (
-                            <div
-                              key={i}
-                              className={`flex justify-between ${item.isNegative ? "text-red-500" : "text-gray-600"}`}
-                            >
-                              <span>{item.title}</span>
-                              <span>
-                                {Math.round(item.amount).toLocaleString()}
-                              </span>
-                            </div>
-                          ))
-                        )}
-                        <div className="flex justify-between font-medium pt-1 mt-1 border-t border-gray-50">
-                          <span>total payments</span>
-                          <span>
-                            {Math.round(details.totalPaid).toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-1 text-xs mt-2 pt-3 border-t border-gray-50">
-                        <span className="text-gray-400 mb-1">
-                          their consumption:
-                        </span>
-                        {details.owedItems.length === 0 ? (
-                          <span className="text-gray-300 italic">-</span>
-                        ) : (
-                          details.owedItems.map((item, i) => (
-                            <div
-                              key={i}
-                              className={`flex justify-between items-start ${item.isSettled ? "text-gray-400 line-through" : "text-gray-600"}`}
-                            >
-                              <div className="flex flex-col flex-1 pr-2">
-                                <span>
-                                  {item.title} {item.isSettled ? "(paid)" : ""}
-                                </span>
-
-                                {item.subItems && item.subItems.length > 0 && (
-                                  <div className="mt-1 flex flex-col gap-0.5">
-                                    {item.subItems.map((sub, idx) => (
-                                      <span
-                                        key={idx}
-                                        className="text-[10px] text-gray-400 leading-tight"
-                                      >
-                                        ↳ {sub}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-
-                                {item.extra ? (
-                                  <span className="text-[10px] text-gray-400 mt-0.5">
-                                    + {item.extra.toLocaleString()} extra
-                                  </span>
-                                ) : null}
-                              </div>
-
-                              <div className="flex flex-col items-end">
-                                <span>
-                                  {Math.round(item.amount).toLocaleString()}
-                                </span>
-                                {item.originalAmount !== undefined &&
-                                  Math.round(item.originalAmount) !==
-                                    Math.round(item.amount) && (
-                                    <span className="text-[10px] text-gray-400 line-through mt-0.5">
-                                      {Math.round(
-                                        item.originalAmount,
-                                      ).toLocaleString()}
-                                    </span>
-                                  )}
-                              </div>
-                            </div>
-                          ))
-                        )}
-                        <div className="flex justify-between font-medium pt-1 mt-1 border-t border-gray-50">
-                          <span>total consumed</span>
-                          <span>
-                            {Math.round(details.totalOwed).toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+            {settlements.length === 0 ? (
+              <div className="bg-emerald-50 border-2 border-emerald-200 rounded-3xl p-6 text-center transform hover:rotate-1 transition-transform">
+                <div className="text-4xl mb-2">⚖️</div>
+                <span className="text-emerald-800 font-extrabold text-base">
+                  everything is perfectly balanced!
+                </span>
+                <p className="text-emerald-600 font-bold text-xs mt-1">
+                  no one owes anyone a dime.
+                </p>
               </div>
-            )}
-          </section>
-        )}
-
-        {unoptimizedDebts.length > 0 &&
-          settlements.length !== unoptimizedDebts.length &&
-          showLedger && (
-            <section className="mt-4 pt-6 border-t border-gray-100">
-              <h2 className="text-sm font-medium text-gray-400 mb-1">
-                direct debts (unoptimized)
-              </h2>
-              <p className="text-xs text-gray-500 mb-4">
-                raw history of who owes who before the app simplifies the
-                transfers.
-              </p>
-              <div className="space-y-2">
-                {unoptimizedDebts.map((debt, index) => (
+            ) : (
+              <div className="space-y-4 relative">
+                <div className="absolute left-6 top-6 bottom-6 w-1 bg-stone-200 rounded-full z-0"></div>
+                {settlements.map((settlement, index) => (
                   <div
                     key={index}
-                    className="flex justify-between items-center p-3 bg-gray-50 border border-gray-100 rounded-lg"
+                    className="flex justify-between items-center p-5 bg-stone-900 text-white rounded-[2rem] shadow-xl shadow-stone-900/10 relative z-10 hover:translate-x-2 transition-transform cursor-default"
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm text-gray-700">
-                        {getMemberName(debt.from)}
-                      </span>
-                      <span className="text-gray-400 text-xs">owes</span>
-                      <span className="font-medium text-sm text-gray-700">
-                        {getMemberName(debt.to)}
-                      </span>
+                    <div className="flex items-center gap-4">
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black border-2 border-white ${getAvatarColor(settlement.from.name)}`}
+                      >
+                        {getInitials(settlement.from.name)}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-extrabold text-lg">
+                          {settlement.from.name}
+                        </span>
+                        <span className="text-stone-400 font-bold text-xs tracking-widest uppercase">
+                          pays
+                        </span>
+                      </div>
                     </div>
-                    <span className="font-medium text-sm text-gray-700">
-                      {Math.round(debt.amount).toLocaleString()}
-                    </span>
+
+                    <div className="flex items-center gap-4 text-right">
+                      <div className="flex flex-col">
+                        <span className="font-extrabold text-lg text-emerald-400">
+                          {Math.round(settlement.amount).toLocaleString()}
+                        </span>
+                        <span className="text-stone-400 font-bold text-xs tracking-widest uppercase">
+                          to {settlement.to.name}
+                        </span>
+                      </div>
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black border-2 border-white ${getAvatarColor(settlement.to.name)}`}
+                      >
+                        {getInitials(settlement.to.name)}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
-            </section>
-          )}
+            )}
 
-        {settlements.length > 0 && (
-          <section className="mt-8 pt-6 border-t border-gray-100">
-            <h2 className="text-sm font-medium text-gray-400 mb-1">
-              how to settle up
-            </h2>
-            <p className="text-xs text-gray-500 mb-4">
-              the smartest way to pay everyone back using the fewest transfers.
-            </p>
-            <div className="space-y-3">
-              {settlements.map((settlement, index) => (
-                <div
-                  key={index}
-                  className="flex justify-between items-center p-4 bg-black text-white rounded-lg shadow-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">
-                      {settlement.from.name}
-                    </span>
-                    <span className="text-gray-400 text-xs">pays</span>
-                    <span className="font-medium text-sm">
-                      {settlement.to.name}
-                    </span>
-                  </div>
-                  <span className="font-medium text-sm">
-                    {Math.round(settlement.amount).toLocaleString()}
-                  </span>
+            {/* transparent detailed ledger logic is back! */}
+            <div className="mt-8">
+              <button
+                onClick={() => setShowLedger(!showLedger)}
+                className="w-full py-4 bg-white border-2 border-stone-200 rounded-2xl text-sm font-extrabold text-stone-600 hover:bg-stone-50 hover:border-stone-300 transition-all shadow-sm active:scale-[0.98]"
+              >
+                {showLedger
+                  ? "hide the boring math ↑"
+                  : "show me the boring math ↓"}
+              </button>
+
+              {showLedger && (
+                <div className="space-y-4 mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                  {trip.members.map((member) => {
+                    const details = memberDetails[member.id];
+                    if (
+                      !details ||
+                      (details.totalPaid === 0 && details.totalOwed === 0)
+                    )
+                      return null;
+                    const net = Math.round(
+                      details.totalPaid - details.totalOwed,
+                    );
+
+                    return (
+                      <div
+                        key={member.id}
+                        className="p-5 bg-white border-2 border-stone-100 rounded-[1.5rem] shadow-sm relative overflow-hidden"
+                      >
+                        {/* receipt style jagged edge top (decorative css hack) */}
+                        <div className="absolute top-0 left-0 right-0 h-1 flex justify-around opacity-20">
+                          {Array.from({ length: 20 }).map((_, i) => (
+                            <div
+                              key={i}
+                              className="w-2 h-2 bg-stone-400 rotate-45 -mt-1"
+                            ></div>
+                          ))}
+                        </div>
+
+                        <div className="flex justify-between items-center border-b-2 border-dashed border-stone-200 pb-4 mb-4 mt-1">
+                          <span className="font-extrabold text-lg text-stone-800">
+                            {member.name}
+                          </span>
+                          <span
+                            className={`text-xs font-black px-3 py-1.5 rounded-xl uppercase tracking-wider ${net > 0 ? "bg-emerald-100 text-emerald-700" : net < 0 ? "bg-rose-100 text-rose-700" : "bg-stone-100 text-stone-600"}`}
+                          >
+                            {net > 0 ? "gets " : net < 0 ? "owes " : "even "}
+                            {Math.abs(net).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex flex-col gap-2 text-xs font-bold text-stone-500 uppercase tracking-wide">
+                          <div className="flex justify-between">
+                            <span>total paid out</span>
+                            <span className="text-stone-800 text-sm">
+                              {Math.round(details.totalPaid).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>total consumed</span>
+                            <span className="text-stone-800 text-sm">
+                              {Math.round(details.totalOwed).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
+              )}
             </div>
           </section>
         )}
       </div>
 
+      {/* magical bouncy FAB for new expense */}
+      {!isAddingExpense && isOwner && trip.status !== "finished" && (
+        <button
+          onClick={() => {
+            if (trip.members.length === 0) {
+              showAlert(
+                "you need to add some friends to the tab first!",
+                "lonely trip? 🧍",
+              );
+              return;
+            }
+            setIsAddingExpense(true);
+          }}
+          className="fixed bottom-8 right-8 lg:bottom-12 lg:right-12 w-16 h-16 bg-stone-900 text-white rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.4)] flex items-center justify-center text-3xl pb-1 hover:bg-emerald-600 hover:scale-110 active:scale-90 transition-all duration-300 z-40 group"
+        >
+          <span className="group-hover:rotate-90 transition-transform duration-300">
+            +
+          </span>
+        </button>
+      )}
+
+      {/* Bottom Sheet Modal for Expense Form */}
+      {isAddingExpense && (
+        <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-md z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300">
+          <div className="bg-[#fdfbf7] w-full max-w-md h-[92vh] sm:h-auto sm:max-h-[92vh] rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl flex flex-col animate-in slide-in-from-bottom-full sm:zoom-in-95 duration-500 overflow-hidden relative">
+            {/* cute little drag handle line */}
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-stone-300 rounded-full sm:hidden"></div>
+
+            <div className="px-6 py-5 pt-8 sm:pt-6 border-b-2 border-stone-100 flex justify-between items-center bg-white z-10 shadow-sm">
+              <h2 className="text-2xl font-black text-stone-800">
+                {editingExpense ? "edit it ✏️" : "new tab 💸"}
+              </h2>
+              <button
+                onClick={() => {
+                  setIsAddingExpense(false);
+                  setEditingExpense(undefined);
+                }}
+                className="w-10 h-10 bg-stone-100 rounded-full flex items-center justify-center text-stone-500 hover:bg-rose-100 hover:text-rose-500 hover:rotate-90 active:scale-90 transition-all font-bold text-lg"
+              >
+                ×
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 pb-12">
+              <ExpenseForm
+                members={trip.members}
+                initialExpense={editingExpense}
+                onSave={handleSaveExpense}
+                onCancel={() => {
+                  setIsAddingExpense(false);
+                  setEditingExpense(undefined);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
       {showSettings && isOwner && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-medium">trip settings</h3>
+        <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-8 duration-300">
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-2xl font-black text-stone-800">
+                trip settings ⚙️
+              </h3>
               <button
                 onClick={() => setShowSettings(false)}
-                className="text-gray-400 hover:text-black"
+                className="w-10 h-10 bg-stone-100 rounded-full flex items-center justify-center text-stone-500 hover:bg-stone-200 active:scale-90 transition-all text-xl"
               >
                 ×
               </button>
             </div>
 
             <form onSubmit={handleRenameTrip} className="mb-8">
-              <label className="block text-xs text-gray-500 mb-2">
+              <label className="block text-sm font-bold text-stone-500 mb-2 ml-1">
                 rename trip
               </label>
               <div className="flex gap-2">
@@ -1045,60 +1047,54 @@ export default function TripDetail() {
                   type="text"
                   value={editTripName}
                   onChange={(e) => setEditTripName(e.target.value)}
-                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-black"
+                  className="flex-1 bg-stone-50 border-2 border-stone-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition-all"
                 />
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-black text-white rounded-xl text-sm font-medium"
+                  className="px-6 py-3.5 bg-stone-900 text-white rounded-2xl text-sm font-bold active:scale-95 transition-all shadow-md"
                 >
                   save
                 </button>
               </div>
             </form>
 
-            <div className="border-t border-gray-100 pt-6 mb-6">
-              <div className="flex justify-between items-center">
+            <div className="border-t-2 border-stone-100 pt-8 mb-8">
+              <div className="flex justify-between items-center p-4 bg-stone-50 rounded-2xl border-2 border-stone-100">
                 <div>
-                  <h4 className="text-sm font-medium text-gray-900">
-                    trip status
+                  <h4 className="text-base font-black text-stone-800">
+                    lock trip 🔒
                   </h4>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="text-xs font-bold text-stone-500 mt-1">
                     {trip.status === "finished"
-                      ? "this trip is locked and archived."
-                      : "this trip is active and editable."}
+                      ? "locked tight."
+                      : "open for business."}
                   </p>
                 </div>
                 <button
                   onClick={async () => {
-                    const newStatus =
-                      trip.status === "finished" ? "ongoing" : "finished";
                     await useTripStore
                       .getState()
-                      .updateTripStatus(tripId, newStatus);
+                      .updateTripStatus(
+                        tripId,
+                        trip.status === "finished" ? "ongoing" : "finished",
+                      );
                     setShowSettings(false);
                   }}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${trip.status === "finished" ? "bg-black" : "bg-gray-200"}`}
+                  className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors active:scale-95 ${trip.status === "finished" ? "bg-emerald-500" : "bg-stone-300"}`}
                 >
                   <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${trip.status === "finished" ? "translate-x-6" : "translate-x-1"}`}
+                    className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-sm transition-transform ${trip.status === "finished" ? "translate-x-7" : "translate-x-1"}`}
                   />
                 </button>
               </div>
             </div>
 
-            <div className="border-t border-red-100 pt-6">
-              <h4 className="text-xs text-red-600 font-medium mb-1">
-                danger zone
-              </h4>
-              <p className="text-xs text-gray-500 mb-4">
-                this will permanently delete the trip and all expenses for
-                everyone.
-              </p>
+            <div className="border-t-2 border-rose-100 pt-8">
               <button
                 onClick={handleFullTripDelete}
-                className="w-full py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-sm font-medium transition-colors"
+                className="w-full py-4 bg-white border-2 border-rose-200 text-rose-600 hover:bg-rose-500 hover:text-white rounded-2xl text-sm font-black transition-all active:scale-95 shadow-sm"
               >
-                delete trip
+                🧨 nuke entire trip
               </button>
             </div>
           </div>

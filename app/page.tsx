@@ -15,7 +15,6 @@ export default function Home() {
   const [isCreating, setIsCreating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // NEW state for tabs, search, and sort
   const [viewMode, setViewMode] = useState<"ongoing" | "finished">("ongoing");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "a_z" | "z_a">(
@@ -51,7 +50,6 @@ export default function Home() {
     router.push(`/trip/${newTripId}`);
   };
 
-  // NEW super-powered filter and sort logic
   const processedTrips = trips
     .filter((t) =>
       viewMode === "finished"
@@ -74,104 +72,65 @@ export default function Home() {
     });
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-6 bg-gray-50">
-      <div className="w-full max-w-md">
-        {/* header */}
+    <main className="flex min-h-screen flex-col items-center p-6 bg-[#fdfbf7] pb-24">
+      <div className="w-full max-w-md relative">
+        {/* cozy header */}
         <div className="flex justify-between items-start mb-8 pt-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-gray-900 mb-1">
-              bills app
+            <h1 className="text-3xl font-semibold tracking-tight text-emerald-800 mb-1">
+              nest.
             </h1>
-            <p className="text-sm text-gray-500">
-              split expenses with friends, instantly.
+            <p className="text-sm text-stone-500 font-medium">
+              split expenses, keep the peace 🌱
             </p>
           </div>
           <ProfileMenu />
         </div>
 
-        {/* create new trip button/form */}
-        {!isCreating ? (
-          <button
-            onClick={() => setIsCreating(true)}
-            className="w-full bg-black text-white rounded-2xl p-4 flex items-center justify-center gap-2 font-medium shadow-sm hover:bg-gray-800 transition-colors mb-8"
-          >
-            <span className="text-lg">+</span> start a new trip
-          </button>
-        ) : (
-          <form
-            onSubmit={handleCreateTrip}
-            className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-8 flex flex-col gap-4"
-          >
-            <div className="flex justify-between items-center">
-              <h2 className="text-sm font-medium">name your trip</h2>
-              <button
-                type="button"
-                onClick={() => setIsCreating(false)}
-                className="text-gray-400 hover:text-black text-xl leading-none"
-              >
-                ×
-              </button>
-            </div>
-            <input
-              type="text"
-              autoFocus
-              placeholder="e.g. bali 2026, friday dinner..."
-              value={newTripName}
-              onChange={(e) => setNewTripName(e.target.value)}
-              className="w-full border-b border-gray-200 py-2 text-sm focus:outline-none focus:border-black bg-transparent"
-            />
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full bg-black text-white rounded-xl py-3 text-sm font-medium hover:bg-gray-800 transition-colors mt-2 disabled:bg-gray-400 flex justify-center items-center"
-            >
-              {isSubmitting ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                "create & invite friends"
-              )}
-            </button>
-          </form>
-        )}
-
         {/* trips list with tabs, search, and sort */}
         <div>
-          <div className="flex gap-4 mb-4 border-b border-gray-200">
+          <div className="flex gap-6 mb-6 border-b border-stone-200">
             <button
               onClick={() => setViewMode("ongoing")}
-              className={`pb-2 text-sm font-medium transition-colors ${
+              className={`pb-3 text-sm font-semibold transition-colors relative ${
                 viewMode === "ongoing"
-                  ? "text-black border-b-2 border-black"
-                  : "text-gray-400 hover:text-gray-600"
+                  ? "text-emerald-700"
+                  : "text-stone-400 hover:text-stone-600"
               }`}
             >
               ongoing
+              {viewMode === "ongoing" && (
+                <span className="absolute -bottom-px left-0 w-full h-0.75 bg-emerald-600 rounded-t-full"></span>
+              )}
             </button>
             <button
               onClick={() => setViewMode("finished")}
-              className={`pb-2 text-sm font-medium transition-colors ${
+              className={`pb-3 text-sm font-semibold transition-colors relative ${
                 viewMode === "finished"
-                  ? "text-black border-b-2 border-black"
-                  : "text-gray-400 hover:text-gray-600"
+                  ? "text-emerald-700"
+                  : "text-stone-400 hover:text-stone-600"
               }`}
             >
-              finished
+              settled up 🤝
+              {viewMode === "finished" && (
+                <span className="absolute -bottom-px left-0 w-full h-0.75 bg-emerald-600 rounded-t-full"></span>
+              )}
             </button>
           </div>
 
-          {/* NEW search and sort UI */}
+          {/* soft search and sort ui */}
           {!isLoading && trips.length > 0 && (
-            <div className="flex gap-2 mb-4">
+            <div className="flex gap-3 mb-6">
               <div className="relative flex-1">
                 <input
                   type="text"
-                  placeholder="search trips..."
+                  placeholder="find a trip..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-black bg-white"
+                  className="w-full pl-10 pr-4 py-3 text-sm border-none shadow-sm rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-100 bg-white text-stone-700 placeholder:text-stone-400"
                 />
                 <svg
-                  className="w-4 h-4 text-gray-400 absolute left-2.5 top-2.5"
+                  className="w-4 h-4 text-stone-400 absolute left-4 top-3.5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -191,7 +150,7 @@ export default function Home() {
                     e.target.value as "newest" | "oldest" | "a_z" | "z_a",
                   )
                 }
-                className="text-sm border border-gray-200 bg-white rounded-xl px-2 py-2 focus:outline-none focus:border-black shrink-0 outline-none"
+                className="text-sm border-none shadow-sm bg-white rounded-2xl px-3 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-100 shrink-0 text-stone-600 font-medium"
               >
                 <option value="newest">newest</option>
                 <option value="oldest">oldest</option>
@@ -202,33 +161,36 @@ export default function Home() {
           )}
 
           {isLoading && trips.length === 0 ? (
-            <div className="text-center py-10">
-              <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-              <p className="text-xs text-gray-500">syncing with cloud...</p>
+            <div className="text-center py-16">
+              <div className="w-8 h-8 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-sm text-stone-500 font-medium">
+                syncing your nest...
+              </p>
             </div>
           ) : processedTrips.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-200">
-              <p className="text-sm text-gray-400">
+            <div className="text-center py-20 bg-white rounded-3xl shadow-sm border border-stone-100">
+              <div className="text-4xl mb-4">🕊️</div>
+              <p className="text-sm text-stone-500 font-medium">
                 {searchQuery
-                  ? "no trips found matching your search."
+                  ? "hmm, couldn't find that trip."
                   : viewMode === "ongoing"
-                    ? "no active trips yet. tap above to start!"
-                    : "no finished trips yet."}
+                    ? "clean slate! where are we heading?"
+                    : "no settled trips yet."}
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {processedTrips.map((trip) => (
                 <button
                   key={trip.id}
                   onClick={() => router.push(`/trip/${trip.id}`)}
-                  className="w-full bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition-all text-left flex justify-between items-center group"
+                  className="w-full bg-white p-5 rounded-3xl shadow-sm border border-stone-100 hover:shadow-md hover:border-emerald-100 transition-all text-left flex justify-between items-center group"
                 >
-                  <div className="flex flex-col gap-1 pr-4 min-w-0">
-                    <h3 className="font-medium text-gray-900 truncate">
+                  <div className="flex flex-col gap-1.5 pr-4 min-w-0">
+                    <h3 className="font-semibold text-stone-800 text-lg truncate">
                       {trip.name}
                     </h3>
-                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <div className="flex items-center gap-2 text-xs font-medium text-stone-400">
                       <span>
                         {new Date(trip.createdAt).toLocaleDateString("en-US", {
                           month: "short",
@@ -237,14 +199,78 @@ export default function Home() {
                       </span>
                     </div>
                   </div>
-                  <div className="shrink-0 w-8 h-8 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-400 group-hover:bg-black group-hover:text-white group-hover:border-black transition-colors">
-                    →
+                  <div className="shrink-0 w-10 h-10 rounded-full bg-stone-50 flex items-center justify-center text-stone-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors">
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
                   </div>
                 </button>
               ))}
             </div>
           )}
         </div>
+
+        {/* floating action button (thumb friendly) */}
+        {!isCreating && (
+          <button
+            onClick={() => setIsCreating(true)}
+            className="fixed bottom-8 right-8 lg:bottom-12 lg:right-12 w-16 h-16 bg-emerald-600 text-white rounded-full shadow-[0_8px_30px_rgb(5,150,105,0.3)] flex items-center justify-center text-3xl pb-1 hover:bg-emerald-700 hover:scale-105 active:scale-95 transition-all z-50"
+          >
+            +
+          </button>
+        )}
+
+        {/* bottom sheet style form overlay */}
+        {isCreating && (
+          <div className="fixed inset-0 bg-stone-900/20 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
+            <form
+              onSubmit={handleCreateTrip}
+              className="bg-white w-full max-w-md p-6 rounded-4xl shadow-2xl flex flex-col gap-5 animate-in slide-in-from-bottom-8 sm:zoom-in-95 duration-200"
+            >
+              <div className="flex justify-between items-center mb-2">
+                <h2 className="text-lg font-semibold text-stone-800">
+                  start a tab
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setIsCreating(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-stone-100 text-stone-500 hover:bg-stone-200 transition-colors"
+                >
+                  ×
+                </button>
+              </div>
+              <input
+                type="text"
+                autoFocus
+                placeholder="e.g. weekend in bali 🌴"
+                value={newTripName}
+                onChange={(e) => setNewTripName(e.target.value)}
+                className="w-full bg-stone-50 border-none rounded-2xl px-4 py-4 text-base focus:outline-none focus:ring-2 focus:ring-emerald-200 text-stone-800 placeholder:text-stone-400"
+              />
+              <button
+                type="submit"
+                disabled={isSubmitting || !newTripName.trim()}
+                className="w-full bg-emerald-600 text-white rounded-2xl py-4 text-base font-semibold hover:bg-emerald-700 transition-colors disabled:bg-stone-300 disabled:text-stone-500 flex justify-center items-center mt-2"
+              >
+                {isSubmitting ? (
+                  <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  "let's go 🚀"
+                )}
+              </button>
+            </form>
+          </div>
+        )}
       </div>
     </main>
   );
