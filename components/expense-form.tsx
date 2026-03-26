@@ -11,6 +11,16 @@ interface ExpenseFormProps {
   onCancel: () => void;
 }
 
+const CATEGORIES = [
+  "food & bev",
+  "shopping",
+  "gas",
+  "hotel",
+  "flights",
+  "activities",
+  "other",
+];
+
 export default function ExpenseForm({
   members,
   initialExpense,
@@ -24,11 +34,9 @@ export default function ExpenseForm({
     return parseInt(numericOnly, 10).toLocaleString("en-US");
   };
 
-  const getRawNumber = (formattedValue: string) => {
-    return parseInt(formattedValue.replace(/,/g, ""), 10) || 0;
-  };
+  const getRawNumber = (formattedValue: string) =>
+    parseInt(formattedValue.replace(/,/g, ""), 10) || 0;
 
-  // beautiful pastel colors for member assignment bubbles
   const getMemberColor = (index: number) => {
     const colors = [
       "bg-blue-50 text-blue-700 border-blue-200 hover:border-blue-300",
@@ -45,6 +53,7 @@ export default function ExpenseForm({
   const [amount, setAmount] = useState(
     initialExpense ? formatNumber(initialExpense.totalAmount) : "",
   );
+  const [category, setCategory] = useState(initialExpense?.category || "other"); // <-- NEW
 
   const [expenseDate, setExpenseDate] = useState(
     initialExpense?.expenseDate
@@ -235,7 +244,6 @@ export default function ExpenseForm({
       Object.entries(savedAdjustments).forEach(([id, val]) => {
         if (!involvedIds.includes(id)) owedBy[id] = val;
       });
-
       if (Object.keys(owedBy).length === 0)
         return alert("please configure the split.");
     }
@@ -253,17 +261,15 @@ export default function ExpenseForm({
           : undefined,
       adjustments: splitType === "adjustment" ? savedAdjustments : undefined,
       settledShares: initialExpense?.settledShares,
-      expenseDate: new Date(expenseDate).toISOString(), // <-- ADDED THIS
-      createdAt: initialExpense?.createdAt || new Date().toISOString(), // <-- ADDED THIS
+      expenseDate: new Date(expenseDate).toISOString(),
+      createdAt: initialExpense?.createdAt || new Date().toISOString(),
+      category, // <-- NEW
     });
   };
 
   const currentTotal = getRawNumber(amount);
   const itemsSum = items.reduce((acc, item) => acc + item.price, 0);
   const difference = currentTotal - itemsSum;
-
-  let adjSum = 0;
-  Object.values(adjustments).forEach((v) => (adjSum += getRawNumber(v)));
 
   return (
     <form
@@ -274,7 +280,7 @@ export default function ExpenseForm({
         <div className="flex gap-4 w-full">
           <input
             type="text"
-            placeholder="what was it? (e.g. de.u coffee)"
+            placeholder="what was it? (e.g. dinner)"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             className="w-2/3 border-b border-gray-200 py-2 text-sm focus:outline-none focus:border-black bg-transparent min-w-0"
@@ -288,14 +294,31 @@ export default function ExpenseForm({
             className="w-1/3 border-b border-gray-200 py-2 text-sm text-right focus:outline-none focus:border-black bg-transparent min-w-0"
           />
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500 w-16">date</span>
-          <input
-            type="date"
-            value={expenseDate}
-            onChange={(e) => setExpenseDate(e.target.value)}
-            className="text-xs border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:border-black"
-          />
+        <div className="flex items-center gap-4 mt-1">
+          <div className="flex items-center gap-2 flex-1">
+            <span className="text-xs text-gray-500 w-12">date</span>
+            <input
+              type="date"
+              value={expenseDate}
+              onChange={(e) => setExpenseDate(e.target.value)}
+              className="w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:border-black bg-transparent"
+            />
+          </div>
+          {/* NEW CATEGORY DROPDOWN */}
+          <div className="flex items-center gap-2 flex-1">
+            <span className="text-xs text-gray-500 w-12 text-right">type</span>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:border-black bg-transparent"
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -340,32 +363,6 @@ export default function ExpenseForm({
                 />
               </div>
             ))}
-            {(() => {
-              let pSum = 0;
-              Object.values(payers).forEach((v) => (pSum += getRawNumber(v)));
-              const diff = currentTotal - pSum;
-              if (currentTotal > 0) {
-                return (
-                  <div className="flex justify-between items-center pt-2 mt-1 border-t border-gray-200 text-[10px]">
-                    <span className="text-gray-400">
-                      total: {pSum.toLocaleString()}
-                    </span>
-                    <span
-                      className={
-                        diff === 0
-                          ? "text-green-600 font-medium"
-                          : "text-red-500 font-medium"
-                      }
-                    >
-                      {diff === 0
-                        ? "matches bill ✓"
-                        : `remaining: ${diff.toLocaleString()}`}
-                    </span>
-                  </div>
-                );
-              }
-              return null;
-            })()}
           </div>
         )}
       </div>
@@ -468,7 +465,6 @@ export default function ExpenseForm({
                   const colorClass = isAssigned
                     ? getMemberColor(mIdx)
                     : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:bg-gray-50";
-
                   return (
                     <button
                       key={m.id}
@@ -483,7 +479,6 @@ export default function ExpenseForm({
               </div>
             </div>
           ))}
-
           <button
             type="button"
             onClick={handleAddItem}

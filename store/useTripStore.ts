@@ -12,6 +12,7 @@ interface TripStore {
   fetchTrip: (tripId: string) => Promise<void>;
   addTrip: (trip: Trip) => Promise<void>;
   renameTrip: (tripId: string, newName: string) => Promise<void>;
+  updateTripStatus: (tripId: string, status: string) => Promise<void>; // <-- NEW
   deleteTrip: (tripId: string) => Promise<void>;
   addMember: (tripId: string, member: Member) => Promise<void>;
   deleteMember: (tripId: string, memberId: string) => Promise<void>;
@@ -34,6 +35,7 @@ interface SupabaseExpenseRow {
   settled_shares?: Record<string, boolean>;
   expense_date: string;
   created_at: string;
+  category: string; // <-- NEW
 }
 
 interface SupabaseTripRow {
@@ -44,6 +46,7 @@ interface SupabaseTripRow {
   created_at: string;
   owner_id: string;
   owner_name: string;
+  status: string; // <-- NEW
 }
 
 // helper to translate database snake_case to our typescript camelCase
@@ -58,7 +61,8 @@ const mapExpense = (exp: SupabaseExpenseRow): Expense => ({
   adjustments: exp.adjustments,
   settledShares: exp.settled_shares,
   expenseDate: exp.expense_date,
-  createdAt: exp.created_at
+  createdAt: exp.created_at,
+  category: exp.category || 'other' // <-- NEW
 });
 
 export const useTripStore = create<TripStore>((set, get) => ({
@@ -70,23 +74,13 @@ export const useTripStore = create<TripStore>((set, get) => ({
 
   fetchTrips: async () => {
     const currentUser = get().user;
-    if (!currentUser) return; // stop if not logged in
+    if (!currentUser) return;
     
     set({ isLoading: true });
 
-    // 1. fetch trips you created
-    const { data: ownedTrips } = await supabase
-      .from("trips")
-      .select("*")
-      .eq("owner_id", currentUser.id);
+    const { data: ownedTrips } = await supabase.from("trips").select("*").eq("owner_id", currentUser.id);
+    const { data: linkedData } = await supabase.from("user_trips").select("trips(*)").eq("user_id", currentUser.id);
 
-    // 2. fetch trips your friends shared that you saved
-    const { data: linkedData } = await supabase
-      .from("user_trips")
-      .select("trips(*)")
-      .eq("user_id", currentUser.id);
-
-    // combine them into a map to remove duplicates
     const allTripsMap = new Map<string, SupabaseTripRow>();
 
     if (ownedTrips) {
@@ -95,10 +89,8 @@ export const useTripStore = create<TripStore>((set, get) => ({
 
     if (linkedData) {
       const safeLinkedData = linkedData as unknown as { trips: SupabaseTripRow | SupabaseTripRow[] | null }[];
-      
       safeLinkedData.forEach((link) => {
         if (!link.trips) return;
-        
         if (Array.isArray(link.trips)) {
           link.trips.forEach(t => allTripsMap.set(t.id, t));
         } else {
@@ -107,14 +99,13 @@ export const useTripStore = create<TripStore>((set, get) => ({
       });
     }
 
-    // sort the combined list by newest first
     const combinedTrips = Array.from(allTripsMap.values()).sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
 
     const mappedTrips = combinedTrips.map(t => ({
        id: t.id, name: t.name, date: t.date || "", currency: t.currency || "IDR", 
-       createdAt: t.created_at, owner_id: t.owner_id, owner_name: t.owner_name, members: [], expenses: []
+       createdAt: t.created_at, owner_id: t.owner_id, owner_name: t.owner_name, status: t.status || 'ongoing', members: [], expenses: []
     }));
 
     set({ trips: mappedTrips, isLoading: false });
@@ -123,11 +114,10 @@ export const useTripStore = create<TripStore>((set, get) => ({
   fetchTrip: async (tripId: string) => {
     set({ isLoading: true });
     
-    // fetch everything in parallel for maximum speed
     const [tripRes, membersRes, expensesRes] = await Promise.all([
       supabase.from("trips").select("*").eq("id", tripId).single(),
       supabase.from("members").select("*").eq("trip_id", tripId),
-      supabase.from("expenses").select("*").eq("trip_id", tripId).order("expense_date", { ascending: false }) // sorts newest first!
+      supabase.from("expenses").select("*").eq("trip_id", tripId).order("expense_date", { ascending: false })
     ]);
 
     if (tripRes.error || !tripRes.data) {
@@ -141,7 +131,9 @@ export const useTripStore = create<TripStore>((set, get) => ({
         date: tripRes.data.date || "",
         currency: tripRes.data.currency || "IDR",
         createdAt: tripRes.data.created_at,
-        owner_id: tripRes.data.owner_id, // <-- add this
+        owner_id: tripRes.data.owner_id,
+        owner_name: tripRes.data.owner_name,
+        status: tripRes.data.status || 'ongoing', // <-- NEW
         members: membersRes.data || [],
         expenses: (expensesRes.data || []).map(mapExpense),
       };
@@ -153,28 +145,28 @@ export const useTripStore = create<TripStore>((set, get) => ({
     });
   },
 
-addTrip: async (trip) => {
+  addTrip: async (trip) => {
     const currentUser = get().user;
     if (!currentUser) return;
 
     set((state) => ({ trips: [trip, ...state.trips] }));
-    
     const displayName = currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || "someone";
 
     await supabase.from("trips").insert({
-      id: trip.id, 
-      name: trip.name, 
-      date: trip.date, 
-      currency: trip.currency, 
-      created_at: trip.createdAt,
-      owner_id: currentUser.id,
-      owner_name: displayName
+      id: trip.id, name: trip.name, date: trip.date, currency: trip.currency, created_at: trip.createdAt,
+      owner_id: currentUser.id, owner_name: displayName, status: trip.status || 'ongoing'
     });
   },
 
   renameTrip: async (tripId, newName) => {
     set((state) => ({ trips: state.trips.map(t => t.id === tripId ? { ...t, name: newName } : t) }));
     await supabase.from("trips").update({ name: newName }).eq("id", tripId);
+  },
+
+  // <-- NEW FUNCTION
+  updateTripStatus: async (tripId, status) => {
+    set((state) => ({ trips: state.trips.map(t => t.id === tripId ? { ...t, status } : t) }));
+    await supabase.from("trips").update({ status }).eq("id", tripId);
   },
 
   deleteTrip: async (tripId) => {
@@ -205,7 +197,7 @@ addTrip: async (trip) => {
     await supabase.from("expenses").insert({
       id: expense.id, trip_id: tripId, title: expense.title, total_amount: expense.totalAmount, paid_by: expense.paidBy, owed_by: expense.owedBy,
       split_type: expense.splitType, items: expense.items || null, adjustments: expense.adjustments || null, settled_shares: expense.settledShares || null,
-      expense_date: expense.expenseDate, created_at: expense.createdAt
+      expense_date: expense.expenseDate, created_at: expense.createdAt, category: expense.category || 'other'
     });
   },
 
@@ -222,7 +214,7 @@ addTrip: async (trip) => {
     await supabase.from("expenses").update({
       title: expense.title, total_amount: expense.totalAmount, paid_by: expense.paidBy, owed_by: expense.owedBy,
       split_type: expense.splitType, items: expense.items || null, adjustments: expense.adjustments || null, settled_shares: expense.settledShares || null,
-      expense_date: expense.expenseDate
+      expense_date: expense.expenseDate, category: expense.category || 'other'
     }).eq("id", expenseId);
   },
 
@@ -251,17 +243,11 @@ addTrip: async (trip) => {
     await supabase.from("expenses").update({ settled_shares: updatedShares }).eq("id", expenseId);
   },
 
-  // THE MAGIC REALTIME ENGINE
   subscribeToTrip: (tripId: string) => {
     const channel = supabase.channel(`trip-${tripId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `trip_id=eq.${tripId}` }, () => {
-        get().fetchTrip(tripId); // quietly reload if someone else adds an expense
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `trip_id=eq.${tripId}` }, () => {
-        get().fetchTrip(tripId);
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `trip_id=eq.${tripId}` }, () => { get().fetchTrip(tripId); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `trip_id=eq.${tripId}` }, () => { get().fetchTrip(tripId); })
       .subscribe();
-      
     return () => { supabase.removeChannel(channel); };
   }
 }));

@@ -54,6 +54,31 @@ export default function TripDetail() {
   const [showSettings, setShowSettings] = useState(false);
   const [editTripName, setEditTripName] = useState("");
 
+  // sorting & filtering state
+  const [sortBy, setSortBy] = useState<"newest" | "amount_high" | "amount_low">(
+    "newest",
+  );
+  const [filterCategory, setFilterCategory] = useState<string>("all");
+
+  const processedExpenses = (trip?.expenses || [])
+    .filter(
+      (exp) => filterCategory === "all" || exp.category === filterCategory,
+    )
+    .sort((a, b) => {
+      if (sortBy === "newest")
+        return (
+          new Date(b.expenseDate).getTime() - new Date(a.expenseDate).getTime()
+        );
+      if (sortBy === "amount_high") return b.totalAmount - a.totalAmount;
+      if (sortBy === "amount_low") return a.totalAmount - b.totalAmount;
+      return 0;
+    });
+
+  // get unique categories from existing expenses for the filter dropdown
+  const usedCategories = Array.from(
+    new Set((trip?.expenses || []).map((e) => e.category || "other")),
+  );
+
   const isOwner = Boolean(
     user?.id && trip?.owner_id && user.id === trip.owner_id,
   );
@@ -450,10 +475,10 @@ export default function TripDetail() {
             {trip.members.map((member) => (
               <div
                 key={member.id}
-                className={`pl-3 ${!isOwner ? "pr-3" : "pr-1"} py-1 bg-gray-100 rounded-full text-xs flex items-center gap-1`}
+                className={`pl-3 ${!isOwner || trip.status === "finished" ? "pr-3" : "pr-1"} py-1 bg-gray-100 rounded-full text-xs flex items-center gap-1`}
               >
                 {member.name}
-                {isOwner && (
+                {isOwner && trip.status !== "finished" && (
                   <button
                     onClick={() => handleRemoveMember(member.id, member.name)}
                     className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-black hover:bg-gray-200 rounded-full transition-colors"
@@ -465,7 +490,7 @@ export default function TripDetail() {
             ))}
           </div>
 
-          {isOwner && (
+          {isOwner && trip.status !== "finished" && (
             <form onSubmit={handleAddMember} className="flex gap-2">
               <input
                 type="text"
@@ -487,19 +512,52 @@ export default function TripDetail() {
         <section>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-sm font-medium text-gray-400">expenses</h2>
-            {isOwner && !isAddingExpense && !editingExpense && (
-              <button
-                onClick={() => {
-                  if (trip.members.length === 0)
-                    return alert("add a member first!");
-                  setIsAddingExpense(true);
-                }}
-                className="text-xs px-3 py-1 bg-black text-white rounded-full"
-              >
-                + new
-              </button>
-            )}
+            {isOwner &&
+              !isAddingExpense &&
+              !editingExpense &&
+              trip.status !== "finished" && (
+                <button
+                  onClick={() => {
+                    if (trip.members.length === 0)
+                      return alert("add a member first!");
+                    setIsAddingExpense(true);
+                  }}
+                  className="text-xs px-3 py-1 bg-black text-white rounded-full"
+                >
+                  + new
+                </button>
+              )}
           </div>
+
+          {trip.expenses.length > 0 && !isAddingExpense && !editingExpense && (
+            <div className="flex gap-2 mb-4">
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="text-xs border border-gray-200 bg-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-black flex-1"
+              >
+                <option value="all">all types</option>
+                {usedCategories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={sortBy}
+                onChange={(e) =>
+                  setSortBy(
+                    e.target.value as "newest" | "amount_high" | "amount_low",
+                  )
+                }
+                className="text-xs border border-gray-200 bg-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-black flex-1"
+              >
+                <option value="newest">newest first</option>
+                <option value="amount_high">highest amount</option>
+                <option value="amount_low">lowest amount</option>
+              </select>
+            </div>
+          )}
 
           {(isAddingExpense || editingExpense) && isOwner && (
             <div className="mb-6">
@@ -516,14 +574,14 @@ export default function TripDetail() {
           )}
 
           <div className="space-y-3">
-            {trip.expenses.length === 0 &&
+            {processedExpenses.length === 0 &&
             !isAddingExpense &&
             !editingExpense ? (
               <div className="text-center py-8 border border-dashed border-gray-200 rounded-lg">
                 <span className="text-xs text-gray-400">no expenses yet.</span>
               </div>
             ) : (
-              trip.expenses.map((exp) => {
+              processedExpenses.map((exp) => {
                 const payersEntries = Object.entries(exp.paidBy);
                 const isMultiPayer = payersEntries.length > 1;
 
@@ -554,6 +612,9 @@ export default function TripDetail() {
                         <p className="text-sm font-medium truncate">
                           {exp.title}
                         </p>
+                        <span className="text-[9px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-md font-medium tracking-wide">
+                          {exp.category || "other"}
+                        </span>
                         <p className="text-xs text-gray-500 truncate">
                           paid by {payerDisplay}
                         </p>
@@ -585,7 +646,10 @@ export default function TripDetail() {
                                 ([id]) => id === memberId,
                               );
                               const canMarkPaid =
-                                !isPayer && isOwner && !isMultiPayer;
+                                !isPayer &&
+                                isOwner &&
+                                !isMultiPayer &&
+                                trip.status !== "finished";
 
                               const isSettled =
                                 exp.settledShares?.[memberId] || false;
@@ -690,7 +754,7 @@ export default function TripDetail() {
                           )}
                         </div>
 
-                        {isOwner && (
+                        {isOwner && trip.status !== "finished" && (
                           <div className="flex gap-2 border-t border-gray-50 pt-3">
                             <button
                               onClick={() => {
@@ -960,6 +1024,36 @@ export default function TripDetail() {
                 </button>
               </div>
             </form>
+
+            <div className="border-t border-gray-100 pt-6 mb-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900">
+                    trip status
+                  </h4>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {trip.status === "finished"
+                      ? "this trip is locked and archived."
+                      : "this trip is active and editable."}
+                  </p>
+                </div>
+                <button
+                  onClick={async () => {
+                    const newStatus =
+                      trip.status === "finished" ? "ongoing" : "finished";
+                    await useTripStore
+                      .getState()
+                      .updateTripStatus(tripId, newStatus);
+                    setShowSettings(false);
+                  }}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${trip.status === "finished" ? "bg-black" : "bg-gray-200"}`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${trip.status === "finished" ? "translate-x-6" : "translate-x-1"}`}
+                  />
+                </button>
+              </div>
+            </div>
 
             <div className="border-t border-red-100 pt-6">
               <h4 className="text-xs text-red-600 font-medium mb-1">
