@@ -13,6 +13,7 @@ export default function Home() {
 
   const [newTripName, setNewTripName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // NEW state for tabs, search, and sort
   const [viewMode, setViewMode] = useState<"ongoing" | "finished">("ongoing");
@@ -28,6 +29,8 @@ export default function Home() {
   const handleCreateTrip = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTripName.trim()) return;
+
+    setIsSubmitting(true);
 
     const newTripId = uuidv4();
     const newTrip = {
@@ -119,9 +122,14 @@ export default function Home() {
             />
             <button
               type="submit"
-              className="w-full bg-black text-white rounded-xl py-3 text-sm font-medium hover:bg-gray-800 transition-colors mt-2"
+              disabled={isSubmitting}
+              className="w-full bg-black text-white rounded-xl py-3 text-sm font-medium hover:bg-gray-800 transition-colors mt-2 disabled:bg-gray-400 flex justify-center items-center"
             >
-              create & invite friends
+              {isSubmitting ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                "create & invite friends"
+              )}
             </button>
           </form>
         )}

@@ -12,7 +12,7 @@ interface TripStore {
   fetchTrip: (tripId: string) => Promise<void>;
   addTrip: (trip: Trip) => Promise<void>;
   renameTrip: (tripId: string, newName: string) => Promise<void>;
-  updateTripStatus: (tripId: string, status: string) => Promise<void>; // <-- NEW
+  updateTripStatus: (tripId: string, status: string) => Promise<void>;
   deleteTrip: (tripId: string) => Promise<void>;
   addMember: (tripId: string, member: Member) => Promise<void>;
   deleteMember: (tripId: string, memberId: string) => Promise<void>;
@@ -21,6 +21,7 @@ interface TripStore {
   deleteExpense: (tripId: string, expenseId: string) => Promise<void>;
   toggleExpenseSettled: (tripId: string, expenseId: string, memberId: string) => Promise<void>;
   subscribeToTrip: (tripId: string) => () => void;
+  isSyncing: boolean;
 }
 
 interface SupabaseExpenseRow {
@@ -71,8 +72,10 @@ export const useTripStore = create<TripStore>((set, get) => ({
 
   trips: [],
   isLoading: false,
+  isSyncing: false,
 
   fetchTrips: async () => {
+
     const currentUser = get().user;
     if (!currentUser) return;
     
@@ -108,7 +111,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
        createdAt: t.created_at, owner_id: t.owner_id, owner_name: t.owner_name, status: t.status || 'ongoing', members: [], expenses: []
     }));
 
-    set({ trips: mappedTrips, isLoading: false });
+    set({ trips: mappedTrips, isLoading: false});
   },
 
   fetchTrip: async (tripId: string) => {
@@ -146,6 +149,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
   },
 
   addTrip: async (trip) => {
+    set({ isSyncing: true });
     const currentUser = get().user;
     if (!currentUser) return;
 
@@ -156,35 +160,48 @@ export const useTripStore = create<TripStore>((set, get) => ({
       id: trip.id, name: trip.name, date: trip.date, currency: trip.currency, created_at: trip.createdAt,
       owner_id: currentUser.id, owner_name: displayName, status: trip.status || 'ongoing'
     });
+    set({ isSyncing: false });
   },
 
   renameTrip: async (tripId, newName) => {
+    set({ isSyncing: true });
     set((state) => ({ trips: state.trips.map(t => t.id === tripId ? { ...t, name: newName } : t) }));
     await supabase.from("trips").update({ name: newName }).eq("id", tripId);
+    set({ isSyncing: false });
   },
 
-  // <-- NEW FUNCTION
   updateTripStatus: async (tripId, status) => {
+    set({ isSyncing: true });
     set((state) => ({ trips: state.trips.map(t => t.id === tripId ? { ...t, status } : t) }));
     await supabase.from("trips").update({ status }).eq("id", tripId);
+    set({ isSyncing: false });
+
   },
 
   deleteTrip: async (tripId) => {
+    set({ isSyncing: true });
     set((state) => ({ trips: state.trips.filter(t => t.id !== tripId) }));
     await supabase.from("trips").delete().eq("id", tripId);
+    set({ isSyncing: false });
   },
 
   addMember: async (tripId, member) => {
+    set({ isSyncing: true });
     set((state) => ({ trips: state.trips.map((t) => t.id === tripId ? { ...t, members: [...t.members, member] } : t) }));
     await supabase.from("members").insert({ id: member.id, trip_id: tripId, name: member.name });
+    set({ isSyncing: false });
   },
 
   deleteMember: async (tripId, memberId) => {
+    set({ isSyncing: true });
     set((state) => ({ trips: state.trips.map((t) => t.id === tripId ? { ...t, members: t.members.filter(m => m.id !== memberId) } : t) }));
-    await supabase.from("members").delete().eq("id", memberId);
+    await supabase.from("members").delete().eq("id", memberId);    
+    set({ isSyncing: false });
+
   },
 
   addExpense: async (tripId, expense) => {
+    set({ isSyncing: true });
     set((state) => ({
       trips: state.trips.map((t) => {
         if (t.id === tripId) {
@@ -199,9 +216,11 @@ export const useTripStore = create<TripStore>((set, get) => ({
       split_type: expense.splitType, items: expense.items || null, adjustments: expense.adjustments || null, settled_shares: expense.settledShares || null,
       expense_date: expense.expenseDate, created_at: expense.createdAt, category: expense.category || 'other'
     });
+    set({ isSyncing: false });
   },
 
   updateExpense: async (tripId, expenseId, expense) => {
+    set({ isSyncing: true });
     set((state) => ({
       trips: state.trips.map((t) => {
         if (t.id === tripId) {
@@ -216,14 +235,19 @@ export const useTripStore = create<TripStore>((set, get) => ({
       split_type: expense.splitType, items: expense.items || null, adjustments: expense.adjustments || null, settled_shares: expense.settledShares || null,
       expense_date: expense.expenseDate, category: expense.category || 'other'
     }).eq("id", expenseId);
+    set({ isSyncing: false });
   },
 
   deleteExpense: async (tripId, expenseId) => {
+    set({ isSyncing: true });
     set((state) => ({ trips: state.trips.map((t) => t.id === tripId ? { ...t, expenses: t.expenses.filter(e => e.id !== expenseId) } : t) }));
     await supabase.from("expenses").delete().eq("id", expenseId);
+    set({ isSyncing: false });
+
   },
 
   toggleExpenseSettled: async (tripId, expenseId, memberId) => {
+    set({ isSyncing: true });
     let updatedShares: Record<string, boolean> = {};
     set((state) => ({
       trips: state.trips.map((t) => {
@@ -241,6 +265,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
       })
     }));
     await supabase.from("expenses").update({ settled_shares: updatedShares }).eq("id", expenseId);
+    set({ isSyncing: false });
   },
 
   subscribeToTrip: (tripId: string) => {

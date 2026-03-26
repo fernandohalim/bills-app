@@ -28,6 +28,7 @@ export default function TripDetail() {
     renameTrip,
     deleteTrip,
     isLoading,
+    isSyncing,
   } = useTripStore();
 
   const trip = trips.find((t) => t.id === tripId);
@@ -328,9 +329,10 @@ export default function TripDetail() {
       deleteMember(tripId, memberId);
   };
 
-  const handleSaveExpense = (expense: Expense) => {
-    if (editingExpense) updateExpense(tripId, expense.id, expense);
-    else addExpense(tripId, expense);
+  const handleSaveExpense = async (expense: Expense) => {
+    if (editingExpense) await updateExpense(tripId, expense.id, expense);
+    else await addExpense(tripId, expense);
+
     setIsAddingExpense(false);
     setEditingExpense(undefined);
   };
@@ -385,11 +387,40 @@ export default function TripDetail() {
                 </span>
               )}
             </div>
-            {trip.owner_name && (
-              <span className="text-[10px] text-gray-400 truncate w-full">
-                created by {trip.owner_name}
-              </span>
-            )}
+
+            <div className="flex items-center gap-2">
+              {trip.owner_name && (
+                <span className="text-[10px] text-gray-400 truncate">
+                  created by {trip.owner_name}
+                </span>
+              )}
+              <span className="text-gray-300 text-[10px]">•</span>
+
+              {/* THE CLOUD SYNC INDICATOR */}
+              {isSyncing ? (
+                <span className="text-[10px] text-blue-500 flex items-center gap-1">
+                  <div className="w-2 h-2 border-[1.5px] border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  saving
+                </span>
+              ) : (
+                <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  synced
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-3 mt-1 shrink-0">
