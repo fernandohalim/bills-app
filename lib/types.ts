@@ -24,6 +24,7 @@ export interface Expense {
 
   expenseDate: string;
   createdAt: string;
+  category?: string;
 }
 
 export interface Trip {
@@ -37,4 +38,5 @@ export interface Trip {
   createdAt: string;
   owner_id?: string;
   owner_name?: string;
+  status?: string;
 }

@@ -22,9 +22,10 @@ export default function AuthProvider({
         data: { session },
       } = await supabase.auth.getSession();
       setUser(session?.user || null);
+      const isPublicRoute = pathname.startsWith("/trip/");
 
       // if no user and they aren't already on the login page, kick them out!
-      if (!session?.user && pathname !== "/login") {
+      if (!session?.user && pathname !== "/login" && !isPublicRoute) {
         router.push("/login");
       }
       setIsInitializing(false);
@@ -37,10 +38,13 @@ export default function AuthProvider({
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
-      if (!session?.user && pathname !== "/login") {
+
+      const isPublicRoute = pathname.startsWith("/trip/");
+
+      if (!session?.user && pathname !== "/login" && !isPublicRoute) {
         router.push("/login");
       } else if (session?.user && pathname === "/login") {
-        router.push("/"); // kick them to dashboard if they try to visit login while logged in
+        router.push("/");
       }
     });
 

@@ -79,7 +79,7 @@ export default function TripDetail() {
 
   const handleToggleBookmark = async () => {
     if (!user) {
-      alert("please sign in to save trips!");
+      router.push("/login");
       return;
     }
 
