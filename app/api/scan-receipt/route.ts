@@ -16,13 +16,13 @@ export async function POST(req: Request) {
     const buffer = Buffer.from(bytes);
     const base64Data = buffer.toString("base64");
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+    // update the prompt section to ask for the exact time
     const prompt = `
       you are an expert receipt parser. extract the following information from this receipt:
       1. the merchant or store name.
-      2. the date of the receipt (format as YYYY-MM-DD. if year is missing, assume the current year).
-      3. guess the most likely category ("food", "transport", "shopping", "entertainment", or "other").
+      2. the date AND time of the receipt. format this strictly as an ISO 8601 string (e.g., "2026-03-27T14:30:00"). if the time is missing, default to "12:00:00". if the year is missing, assume the current year.
+      3. guess the most likely category. you MUST pick strictly from this exact list: "food & bev", "shopping", "transportation", "hotel", "flights", "activities", or "other".
       4. the individual purchased items and their TOTAL prices (include quantity in the name if > 1, e.g., "es teh manis x2").
       5. the FINAL total amount paid (after all taxes, service charges, and discounts).
 
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
       return the result STRICTLY as a JSON object matching this exact structure:
       {
         "merchantName": "sate taichan senayan",
-        "date": "2026-03-27",
+        "date": "2026-03-27T19:45:00",
         "category": "food",
         "totalAmount": 127600,
         "items": [

@@ -294,32 +294,37 @@ export default function Home() {
                     <h3 className="font-extrabold text-stone-800 text-lg sm:text-xl truncate group-hover:text-emerald-700 transition-colors">
                       {trip.name}
                     </h3>
-                    <div className="flex items-center flex-wrap gap-2 text-[10px] sm:text-xs font-bold text-stone-400 uppercase tracking-wider">
-                      {/* author badge */}
-                      <span className="bg-stone-50 border border-stone-100 text-stone-500 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
-                        {trip.owner_id === user?.id ? "you" : trip.owner_name}{" "}
-                        👑
-                      </span>
+                    <div className="flex flex-col gap-1.5 text-[10px] sm:text-xs font-bold text-stone-400 uppercase tracking-wider">
+                      {/* top row: author and member count */}
+                      <div className="flex items-center flex-wrap gap-2">
+                        {/* author badge */}
+                        <span className="bg-stone-50 border border-stone-100 text-stone-500 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
+                          {trip.owner_id === user?.id ? "you" : trip.owner_name}{" "}
+                          👑
+                        </span>
 
-                      <span className="hidden sm:inline">•</span>
+                        {trip.members && trip.members.length > 0 && (
+                          <>
+                            <span>•</span>
+                            <span className="shrink-0">
+                              {trip.members.length}{" "}
+                              {trip.members.length === 1 ? "member" : "members"}
+                            </span>
+                          </>
+                        )}
+                      </div>
 
-                      <span className="shrink-0">
-                        {new Date(trip.createdAt).toLocaleDateString("en-US", {
+                      {/* bottom row: created date */}
+                      <span className="text-stone-400/80">
+                        created at{" "}
+                        {new Date(trip.createdAt).toLocaleString("en-US", {
                           month: "short",
                           day: "numeric",
                           year: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
                         })}
                       </span>
-
-                      {trip.members && trip.members.length > 0 && (
-                        <>
-                          <span>•</span>
-                          <span className="shrink-0">
-                            {trip.members.length}{" "}
-                            {trip.members.length === 1 ? "member" : "members"}
-                          </span>
-                        </>
-                      )}
                     </div>
                   </div>
                   <div className="shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-stone-50 flex items-center justify-center text-stone-400 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors shadow-sm border border-stone-100 group-hover:border-emerald-200 group-hover:-rotate-45">

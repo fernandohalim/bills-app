@@ -89,9 +89,9 @@ export default function TripDetail() {
   const [showSettings, setShowSettings] = useState(false);
   const [editTripName, setEditTripName] = useState("");
 
-  const [sortBy, setSortBy] = useState<"newest" | "amount_high" | "amount_low">(
-    "newest",
-  );
+  const [sortBy, setSortBy] = useState<
+    "newest" | "oldest" | "amount_high" | "amount_low"
+  >("newest");
   const [filterCategory, setFilterCategory] = useState<string>("all");
 
   const processedExpenses = (trip?.expenses || [])
@@ -99,12 +99,23 @@ export default function TripDetail() {
       (exp) => filterCategory === "all" || exp.category === filterCategory,
     )
     .sort((a, b) => {
-      if (sortBy === "newest")
+      if (sortBy === "newest") {
         return (
           new Date(b.expenseDate).getTime() - new Date(a.expenseDate).getTime()
         );
-      if (sortBy === "amount_high") return b.totalAmount - a.totalAmount;
-      if (sortBy === "amount_low") return a.totalAmount - b.totalAmount;
+      }
+      if (sortBy === "oldest") {
+        return (
+          new Date(a.expenseDate).getTime() - new Date(b.expenseDate).getTime()
+        );
+      }
+      if (sortBy === "amount_high") {
+        return b.totalAmount - a.totalAmount;
+      }
+      // lowest amount first
+      if (sortBy === "amount_low") {
+        return a.totalAmount - b.totalAmount;
+      }
       return 0;
     });
 
@@ -437,10 +448,7 @@ export default function TripDetail() {
 
       let parsedDate = new Date().toISOString();
       if (data.date) {
-        const d = new Date(data.date);
-        if (!isNaN(d.getTime())) {
-          parsedDate = d.toISOString();
-        }
+        parsedDate = data.date;
       }
 
       const scannedExpense: Expense = {
@@ -648,11 +656,36 @@ export default function TripDetail() {
             )}
           </div>
 
+          {/* sleek pre-header timestamp above the title */}
+          <div className="text-[10px] sm:text-xs font-black tracking-widest text-emerald-200/80 uppercase mb-1.5 relative z-10 flex items-center justify-center gap-1.5">
+            <svg
+              className="w-3.5 h-3.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2.5}
+                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
+            </svg>
+            {new Date(trip.createdAt).toLocaleString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+            })}
+          </div>
+
           <h1 className="text-3xl font-extrabold tracking-tight mb-2 relative z-10">
             {trip.name}
           </h1>
 
-          <div className="text-xs font-bold text-emerald-100 mb-2 relative z-10 flex items-center gap-1.5">
+          {/* cleaned up created by row */}
+          <div className="text-xs font-bold text-emerald-100 mb-2 relative z-10 flex items-center justify-center gap-1.5">
             <span>created by</span>
             <span className="text-white bg-black/20 px-2 py-0.5 rounded-md backdrop-blur-sm shadow-inner">
               {isOwner ? "you" : trip.owner_name || "the host"} 👑
@@ -788,10 +821,13 @@ export default function TripDetail() {
               <CustomSelect
                 value={sortBy}
                 onChange={(val) =>
-                  setSortBy(val as "newest" | "amount_high" | "amount_low")
+                  setSortBy(
+                    val as "newest" | "oldest" | "amount_high" | "amount_low",
+                  )
                 }
                 options={[
                   { value: "newest", label: "latest first" },
+                  { value: "oldest", label: "oldest first" },
                   { value: "amount_high", label: "highest $$" },
                   { value: "amount_low", label: "lowest $$" },
                 ]}
@@ -845,14 +881,13 @@ export default function TripDetail() {
                       <div className="flex-1 min-w-0">
                         <div className="mb-1 flex flex-col">
                           <span className="text-[10px] font-black text-stone-400 tracking-widest uppercase mb-0.5">
-                            {new Date(exp.expenseDate).toLocaleDateString(
-                              "en-US",
-                              {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              },
-                            )}
+                            {new Date(exp.expenseDate).toLocaleString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })}
                           </span>
                           <p className="text-base sm:text-lg font-extrabold text-stone-800 truncate">
                             {exp.title}
@@ -1346,12 +1381,21 @@ export default function TripDetail() {
         <div className="fixed bottom-8 right-8 lg:bottom-12 lg:right-12 flex flex-col gap-3 z-40 items-end animate-in slide-in-from-bottom-8 duration-500">
           {/* scan receipt pill */}
           <button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => {
+              if (trip.members.length === 0) {
+                showAlert(
+                  "you need to add some friends to the tab first!",
+                  "lonely trip? 🧍",
+                );
+                return;
+              }
+              fileInputRef.current?.click();
+            }}
             disabled={isScanning}
             className="flex items-center gap-3 pl-5 pr-2 py-2 bg-white/90 backdrop-blur-md text-stone-600 border-2 border-stone-100 rounded-full shadow-lg hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 active:scale-95 transition-all duration-300 disabled:opacity-50 group"
           >
             <span className="text-xs font-black tracking-widest uppercase">
-              upload bill
+              scan bill
             </span>
             <div className="w-10 h-10 rounded-full bg-stone-100 group-hover:bg-emerald-200 flex items-center justify-center transition-colors">
               <svg

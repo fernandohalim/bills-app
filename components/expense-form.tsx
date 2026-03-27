@@ -17,12 +17,22 @@ interface ExpenseFormProps {
 const CATEGORIES = [
   { value: "food & bev", label: "🍔 food & bev" },
   { value: "shopping", label: "🛍️ shopping" },
-  { value: "gas", label: "⛽ gas & travel" },
+  { value: "transportation", label: "⛽ transportation" },
   { value: "hotel", label: "🏨 hotel & stay" },
   { value: "flights", label: "✈️ flights" },
   { value: "activities", label: "🏄 activities" },
   { value: "other", label: "✨ other" },
 ];
+
+const getLocalISOString = () => {
+  const date = new Date();
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const h = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${d}T${h}:${min}:00`;
+};
 
 export default function ExpenseForm({
   members,
@@ -48,9 +58,7 @@ export default function ExpenseForm({
     initialExpense?.category || "food & bev",
   );
   const [expenseDate, setExpenseDate] = useState(
-    initialExpense?.expenseDate
-      ? new Date(initialExpense.expenseDate).toISOString().split("T")[0]
-      : new Date().toISOString().split("T")[0],
+    initialExpense?.expenseDate || getLocalISOString(),
   );
 
   const [isMultiplePayers, setIsMultiplePayers] = useState(
@@ -332,9 +340,9 @@ export default function ExpenseForm({
       </div>
 
       {/* Meta details */}
-      <div className="flex gap-3">
-        <div className="flex-1 bg-white border-2 border-stone-100 rounded-2xl relative shadow-sm focus-within:border-emerald-400 focus-within:ring-4 focus-within:ring-emerald-100 transition-all">
-          <label className="absolute -top-2.5 left-3 bg-white px-1 text-[10px] font-black text-stone-400 uppercase tracking-widest z-10">
+      <div className="flex gap-3 mt-2">
+        <div className="flex-1 relative">
+          <label className="absolute -top-2.5 left-3 bg-white px-1 text-[10px] font-black text-stone-400 uppercase tracking-widest z-10 pointer-events-none">
             date
           </label>
           <CustomDatePicker
@@ -344,8 +352,8 @@ export default function ExpenseForm({
           />
         </div>
 
-        <div className="flex-1 bg-white border-2 border-stone-100 rounded-2xl relative shadow-sm focus-within:border-emerald-400 focus-within:ring-4 focus-within:ring-emerald-100 transition-all">
-          <label className="absolute -top-2.5 left-3 bg-white px-1 text-[10px] font-black text-stone-400 uppercase tracking-widest z-10">
+        <div className="flex-1 relative">
+          <label className="absolute -top-2.5 left-3 bg-white px-1 text-[10px] font-black text-stone-400 uppercase tracking-widest z-10 pointer-events-none">
             type
           </label>
           <CustomSelect
