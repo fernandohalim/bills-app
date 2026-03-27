@@ -302,6 +302,8 @@ export default function ExpenseForm({
   const itemsSum = items.reduce((acc, item) => acc + item.price, 0);
   const difference = currentTotal - itemsSum;
 
+  const newLocal =
+    "flex-[2] py-4.5 bg-stone-900 text-white rounded-2xl text-base font-black hover:bg-emerald-600 transition-all shadow-xl shadow-stone-900/20 hover:shadow-emerald-600/30 active:scale-95 disabled:bg-stone-300 disabled:shadow-none flex justify-center items-center";
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-8">
       {/* Hero Inputs */}
@@ -512,7 +514,7 @@ export default function ExpenseForm({
                     onChange={(e) =>
                       handleItemChange(item.id, "name", e.target.value)
                     }
-                    className="flex-[6] min-w-0 text-sm font-black bg-transparent px-4 py-3 sm:py-4 focus:outline-none focus:bg-white transition-all border-r-2 border-stone-100"
+                    className="flex-6 min-w-0 text-sm font-black bg-transparent px-4 py-3 sm:py-4 focus:outline-none focus:bg-white transition-all border-r-2 border-stone-100"
                   />
                   <input
                     type="text"
@@ -522,7 +524,7 @@ export default function ExpenseForm({
                     onChange={(e) =>
                       handleItemChange(item.id, "price", e.target.value)
                     }
-                    className="flex-[4] min-w-0 text-sm font-black text-right bg-transparent px-3 py-3 sm:py-4 focus:outline-none focus:bg-white transition-all text-emerald-600 border-r-2 border-stone-100"
+                    className="flex-4 min-w-0 text-sm font-black text-right bg-transparent px-3 py-3 sm:py-4 focus:outline-none focus:bg-white transition-all text-emerald-600 border-r-2 border-stone-100"
                   />
                   <button
                     type="button"
@@ -544,7 +546,7 @@ export default function ExpenseForm({
                         onClick={() => toggleItemMember(item.id, m.id)}
                         className={`text-[10px] sm:text-[11px] font-black px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full transition-all active:scale-90 ${
                           isAssigned
-                            ? "bg-stone-800 text-white shadow-md shadow-stone-800/20 translate-y-[-1px]"
+                            ? "bg-stone-800 text-white shadow-md shadow-stone-800/20 -translate-y-px"
                             : "bg-stone-50 text-stone-400 border-2 border-stone-100 hover:bg-stone-200"
                         }`}
                       >
@@ -559,7 +561,7 @@ export default function ExpenseForm({
             <button
               type="button"
               onClick={handleAddItem}
-              className="w-full py-3.5 sm:py-4 text-sm font-black text-stone-500 bg-stone-100 hover:bg-emerald-100 hover:text-emerald-700 rounded-[2rem] transition-all active:scale-95 border-2 border-dashed border-stone-300 hover:border-emerald-300"
+              className="w-full py-3.5 sm:py-4 text-sm font-black text-stone-500 bg-stone-100 hover:bg-emerald-100 hover:text-emerald-700 rounded-4xl transition-all active:scale-95 border-2 border-dashed border-stone-300 hover:border-emerald-300"
             >
               + add another item
             </button>
@@ -592,11 +594,7 @@ export default function ExpenseForm({
         >
           nah, cancel
         </button>
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="flex-[2] py-4.5 bg-stone-900 text-white rounded-2xl text-base font-black hover:bg-emerald-600 transition-all shadow-xl shadow-stone-900/20 hover:shadow-emerald-600/30 active:scale-95 disabled:bg-stone-300 disabled:shadow-none flex justify-center items-center"
-        >
+        <button type="submit" disabled={isSubmitting} className={newLocal}>
           {isSubmitting ? (
             <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
           ) : initialExpense ? (

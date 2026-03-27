@@ -664,27 +664,81 @@ export default function TripDetail() {
                   : getMemberName(payersEntries[0][0]);
                 const isExpanded = expandedExpenseId === exp.id;
 
+                // calculate tax/tip differences for exact splits
+                const itemsSum =
+                  exp.splitType === "exact" && exp.items
+                    ? exp.items.reduce((acc, item) => acc + item.price, 0)
+                    : 0;
+                const difference = exp.totalAmount - itemsSum;
+
                 return (
                   <div
                     key={exp.id}
                     className="bg-white rounded-[1.5rem] shadow-sm border-2 border-stone-100 overflow-hidden group hover:border-emerald-200 hover:shadow-md transition-all duration-300"
                   >
-                    <button onClick={() => setExpandedExpenseId(isExpanded ? null : exp.id)} className="w-full flex justify-between items-center p-4 sm:p-5 text-left active:bg-stone-50 transition-colors gap-3">
+                    <button
+                      onClick={() =>
+                        setExpandedExpenseId(isExpanded ? null : exp.id)
+                      }
+                      className="w-full flex justify-between items-center p-4 sm:p-5 text-left active:bg-stone-50 transition-colors gap-3"
+                    >
                       <div className="flex-1 min-w-0">
                         <div className="mb-1">
-                          <p className="text-base sm:text-lg font-extrabold text-stone-800 truncate">{exp.title}</p>
+                          <p className="text-base sm:text-lg font-extrabold text-stone-800 truncate">
+                            {exp.title}
+                          </p>
                         </div>
-                        <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm font-bold text-stone-400">
-                          <span className="px-1.5 py-0.5 sm:px-2 sm:py-0.5 bg-stone-100 text-stone-500 rounded-md text-[9px] sm:text-[10px] tracking-widest uppercase shrink-0">{exp.category || "other"}</span>
-                          <span className="truncate flex-1 min-w-0">• paid by <span className="text-stone-700">{payerDisplay}</span></span>
+                        <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 text-[11px] sm:text-sm font-bold text-stone-400">
+                          <span className="px-1.5 py-0.5 sm:px-2 sm:py-0.5 bg-stone-100 text-stone-500 rounded-md text-[9px] sm:text-[10px] tracking-widest uppercase shrink-0">
+                            {exp.category || "other"}
+                          </span>
+
+                          <span
+                            className={`px-1.5 py-0.5 sm:px-2 sm:py-0.5 rounded-md text-[9px] sm:text-[10px] tracking-widest uppercase shrink-0 border ${
+                              exp.splitType === "exact"
+                                ? "border-indigo-100 text-indigo-500 bg-indigo-50"
+                                : exp.splitType === "equal"
+                                  ? "border-emerald-100 text-emerald-500 bg-emerald-50"
+                                  : "border-amber-100 text-amber-500 bg-amber-50"
+                            }`}
+                          >
+                            {exp.splitType === "exact"
+                              ? "by item"
+                              : exp.splitType === "equal"
+                                ? "equally"
+                                : "custom"}
+                          </span>
+
+                          <span className="truncate flex-1 min-w-0">
+                            • paid by{" "}
+                            <span className="text-stone-700">
+                              {payerDisplay}
+                            </span>
+                          </span>
                         </div>
                       </div>
                       <div className="text-right shrink-0 pl-2">
-                        <p className="text-lg sm:text-xl font-black text-emerald-600">{exp.totalAmount.toLocaleString()}</p>
+                        <p className="text-lg sm:text-xl font-black text-emerald-600">
+                          {exp.totalAmount.toLocaleString()}
+                        </p>
                         <p className="text-[10px] sm:text-xs font-bold text-stone-400 mt-1 flex items-center justify-end gap-1">
-                          {isExpanded ? "close" : "details"} 
-                          <span className={`w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center bg-stone-100 rounded-full transition-transform duration-300 ${isExpanded ? "rotate-180 bg-emerald-100 text-emerald-600" : ""}`}>
-                            <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                          {isExpanded ? "close" : "details"}
+                          <span
+                            className={`w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center bg-stone-100 rounded-full transition-transform duration-300 ${isExpanded ? "rotate-180 bg-emerald-100 text-emerald-600" : ""}`}
+                          >
+                            <svg
+                              className="w-2.5 h-2.5 sm:w-3 sm:h-3"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth={3}
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M19 9l-7 7-7-7"
+                              />
+                            </svg>
                           </span>
                         </p>
                       </div>
@@ -692,7 +746,67 @@ export default function TripDetail() {
 
                     {isExpanded && (
                       <div className="p-5 border-t-2 border-stone-100 bg-stone-50/50 animate-in slide-in-from-top-2 duration-200">
+                        {/* itemized receipt section for exact splits */}
+                        {exp.splitType === "exact" &&
+                          exp.items &&
+                          exp.items.length > 0 && (
+                            <div className="mb-6 space-y-3">
+                              <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest px-1">
+                                receipt items
+                              </span>
+                              <div className="bg-white rounded-2xl p-4 flex flex-col gap-3 border border-stone-100 shadow-sm">
+                                {exp.items.map((item) => (
+                                  <div
+                                    key={item.id}
+                                    className="flex justify-between items-center text-sm"
+                                  >
+                                    <div className="flex flex-col">
+                                      <span className="font-bold text-stone-700">
+                                        {item.name}
+                                      </span>
+                                      <span className="text-[10px] sm:text-xs font-bold text-stone-400 mt-0.5">
+                                        {item.assignedTo
+                                          .map((id) => getMemberName(id))
+                                          .join(", ")}
+                                      </span>
+                                    </div>
+                                    <span className="font-black text-stone-600">
+                                      {Math.round(item.price).toLocaleString()}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* tax/tip/discount banner */}
+                              {Math.abs(difference) > 0 && (
+                                <div className="p-4 bg-amber-50 border-2 border-amber-100 rounded-2xl text-xs sm:text-sm font-bold text-amber-800 flex items-start gap-3 shadow-sm">
+                                  <span className="text-xl leading-none">
+                                    💡
+                                  </span>
+                                  <p className="leading-tight">
+                                    subtotal is{" "}
+                                    <span className="font-black">
+                                      {Math.round(itemsSum).toLocaleString()}
+                                    </span>
+                                    . the extra{" "}
+                                    <span className="font-black">
+                                      {Math.round(
+                                        Math.abs(difference),
+                                      ).toLocaleString()}
+                                    </span>{" "}
+                                    {difference > 0 ? "tax/tip" : "discount"} is
+                                    split fairly across the items.
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                         <div className="space-y-3 mb-6">
+                          <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest px-1">
+                            who owes what
+                          </span>
+
                           {Object.entries(exp.owedBy).map(
                             ([memberId, amount]) => {
                               const isPayer = payersEntries.some(
@@ -821,23 +935,38 @@ export default function TripDetail() {
               <div className="space-y-4 relative">
                 <div className="absolute left-6 top-6 bottom-6 w-1 bg-stone-200 rounded-full z-0"></div>
                 {settlements.map((settlement, index) => (
-                  <div key={index} className="flex justify-between items-center p-4 sm:p-5 bg-stone-900 text-white rounded-[2rem] shadow-xl shadow-stone-900/10 relative z-10 hover:translate-x-2 transition-transform cursor-default gap-2">
+                  <div
+                    key={index}
+                    className="flex justify-between items-center p-4 sm:p-5 bg-stone-900 text-white rounded-4xl shadow-xl shadow-stone-900/10 relative z-10 hover:translate-x-2 transition-transform cursor-default gap-2"
+                  >
                     <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-                      <div className={`w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-full flex items-center justify-center text-xs sm:text-sm font-black border-2 border-white ${getAvatarColor(settlement.from.name)}`}>
+                      <div
+                        className={`w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-full flex items-center justify-center text-xs sm:text-sm font-black border-2 border-white ${getAvatarColor(settlement.from.name)}`}
+                      >
                         {getInitials(settlement.from.name)}
                       </div>
                       <div className="flex flex-col min-w-0">
-                        <span className="font-extrabold text-base sm:text-lg truncate">{settlement.from.name}</span>
-                        <span className="text-stone-400 font-bold text-[9px] sm:text-xs tracking-widest uppercase">pays</span>
+                        <span className="font-extrabold text-base sm:text-lg truncate">
+                          {settlement.from.name}
+                        </span>
+                        <span className="text-stone-400 font-bold text-[9px] sm:text-xs tracking-widest uppercase">
+                          pays
+                        </span>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-2 sm:gap-4 text-right flex-1 min-w-0 justify-end">
                       <div className="flex flex-col min-w-0 items-end">
-                        <span className="font-extrabold text-base sm:text-lg text-emerald-400 truncate max-w-full">{Math.round(settlement.amount).toLocaleString()}</span>
-                        <span className="text-stone-400 font-bold text-[9px] sm:text-xs tracking-widest uppercase truncate max-w-full">to {settlement.to.name}</span>
+                        <span className="font-extrabold text-base sm:text-lg text-emerald-400 truncate max-w-full">
+                          {Math.round(settlement.amount).toLocaleString()}
+                        </span>
+                        <span className="text-stone-400 font-bold text-[9px] sm:text-xs tracking-widest uppercase truncate max-w-full">
+                          to {settlement.to.name}
+                        </span>
                       </div>
-                      <div className={`w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-full flex items-center justify-center text-xs sm:text-sm font-black border-2 border-white ${getAvatarColor(settlement.to.name)}`}>
+                      <div
+                        className={`w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-full flex items-center justify-center text-xs sm:text-sm font-black border-2 border-white ${getAvatarColor(settlement.to.name)}`}
+                      >
                         {getInitials(settlement.to.name)}
                       </div>
                     </div>
@@ -873,7 +1002,7 @@ export default function TripDetail() {
                     return (
                       <div
                         key={member.id}
-                        className="p-5 bg-white border-2 border-stone-100 rounded-[1.5rem] shadow-sm relative overflow-hidden"
+                        className="p-5 bg-white border-2 border-stone-100 rounded-3xl shadow-sm relative overflow-hidden"
                       >
                         {/* receipt style jagged edge top (decorative css hack) */}
                         <div className="absolute top-0 left-0 right-0 h-1 flex justify-around opacity-20">
@@ -994,15 +1123,22 @@ export default function TripDetail() {
             </div>
 
             <form onSubmit={handleRenameTrip} className="mb-8">
-              <label className="block text-sm font-bold text-stone-500 mb-2 ml-1">rename trip</label>
+              <label className="block text-sm font-bold text-stone-500 mb-2 ml-1">
+                rename trip
+              </label>
               <div className="flex gap-2 w-full">
-                <input 
-                  type="text" 
-                  value={editTripName} 
-                  onChange={(e) => setEditTripName(e.target.value)} 
-                  className="flex-1 min-w-0 bg-stone-50 border-2 border-stone-100 rounded-2xl px-4 sm:px-5 py-3 sm:py-3.5 text-sm font-bold focus:outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition-all" 
+                <input
+                  type="text"
+                  value={editTripName}
+                  onChange={(e) => setEditTripName(e.target.value)}
+                  className="flex-1 min-w-0 bg-stone-50 border-2 border-stone-100 rounded-2xl px-4 sm:px-5 py-3 sm:py-3.5 text-sm font-bold focus:outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition-all"
                 />
-                <button type="submit" className="shrink-0 px-5 sm:px-6 py-3 sm:py-3.5 bg-stone-900 text-white rounded-2xl text-sm font-bold active:scale-95 transition-all shadow-md">save</button>
+                <button
+                  type="submit"
+                  className="shrink-0 px-5 sm:px-6 py-3 sm:py-3.5 bg-stone-900 text-white rounded-2xl text-sm font-bold active:scale-95 transition-all shadow-md"
+                >
+                  save
+                </button>
               </div>
             </form>
 
