@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTripStore } from "@/store/useTripStore";
 import { useAlertStore } from "@/store/useAlertStore";
@@ -75,6 +75,9 @@ export default function TripDetail() {
 
   const [newMemberName, setNewMemberName] = useState("");
   const [isAddingExpense, setIsAddingExpense] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState(0);
   const [editingExpense, setEditingExpense] = useState<Expense | undefined>(
     undefined,
   );
@@ -379,10 +382,102 @@ export default function TripDetail() {
   };
 
   const handleSaveExpense = async (expense: Expense) => {
-    if (editingExpense) await updateExpense(tripId, expense.id, expense);
-    else await addExpense(tripId, expense);
+    const exists = trip?.expenses.some((e) => e.id === expense.id);
+
+    if (exists) {
+      await updateExpense(tripId, expense.id, expense);
+    } else {
+      await addExpense(tripId, expense);
+    }
+
     setIsAddingExpense(false);
     setEditingExpense(undefined);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 1. reset progress and trigger the laser overlay
+    setScanProgress(0);
+    setIsScanning(true);
+
+    // 2. start the smart simulated progress bar
+    const progressInterval = setInterval(() => {
+      setScanProgress((prev) => {
+        // cap the fake progress at 90% while we wait for gemini
+        if (prev >= 90) return prev;
+        // randomly jump up by 5% to 20% to make it feel organic
+        return prev + Math.floor(Math.random() * 15) + 5;
+      });
+    }, 300); // ticks every 300ms
+
+    try {
+      const formData = new FormData();
+      formData.append("receipt", file);
+
+      const res = await fetch("/api/scan-receipt", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("failed to scan");
+      const data = await res.json();
+
+      const formattedItems = data.items.map((item: any) => ({
+        id: uuidv4(),
+        name: item.name,
+        price: item.price,
+        assignedTo: [],
+      }));
+
+      const totalScannedAmount =
+        data.totalAmount ||
+        formattedItems.reduce((sum: number, item: any) => sum + item.price, 0);
+
+      let parsedDate = new Date().toISOString();
+      if (data.date) {
+        const d = new Date(data.date);
+        if (!isNaN(d.getTime())) {
+          parsedDate = d.toISOString();
+        }
+      }
+
+      const scannedExpense: Expense = {
+        id: uuidv4(),
+        title: data.merchantName
+          ? `📝 ${data.merchantName}`
+          : "📝 scanned receipt",
+        totalAmount: totalScannedAmount,
+        paidBy: { [user!.id]: totalScannedAmount },
+        owedBy: {},
+        splitType: "exact",
+        items: formattedItems,
+        expenseDate: parsedDate,
+        createdAt: new Date().toISOString(),
+        category: data.category || "other",
+      };
+
+      // 3. gemini is done! snap to 100% and wait half a second so the user sees it finish
+      clearInterval(progressInterval);
+      setScanProgress(100);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      setEditingExpense(scannedExpense);
+      setIsAddingExpense(true);
+    } catch (error) {
+      console.error("upload error:", error);
+      clearInterval(progressInterval);
+      showAlert(
+        "couldn't read that receipt, try another one!",
+        "scan failed ❌",
+      );
+    } finally {
+      clearInterval(progressInterval);
+      setIsScanning(false);
+      setTimeout(() => setScanProgress(0), 300); // silently reset back to 0
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const handleDeleteExpense = (expenseId: string) => {
@@ -526,7 +621,9 @@ export default function TripDetail() {
 
           <div className="flex flex-wrap justify-center gap-2 mb-4 relative z-10">
             <div className="px-4 py-1.5 bg-white/10 backdrop-blur-md rounded-full text-xs font-bold tracking-widest uppercase border border-white/20">
-              {trip.status === "finished" ? "🔒 late trip" : "💸 active trip"}
+              {trip.status === "finished"
+                ? "🔒 settled trip"
+                : "💸 active trip"}
             </div>
 
             {/* NEW: Collaboration status badge so viewers know the rules! */}
@@ -582,7 +679,7 @@ export default function TripDetail() {
           </div>
         </div>
 
-        {isOwner && (
+        {isOwner && trip.status !== "finished" && (
           <div className="bg-white border-2 border-stone-100 rounded-3xl p-5 shadow-sm mb-10 flex items-center justify-between group hover:border-emerald-200 transition-colors animate-in slide-in-from-bottom-4 duration-500">
             <div className="flex flex-col">
               <span className="font-black text-stone-800 text-base flex items-center gap-2">
@@ -1235,25 +1332,130 @@ export default function TripDetail() {
         )}
       </div>
 
-      {/* magical bouncy FAB for new expense */}
+      {/* hidden file input for the receipt scanner */}
+      <input
+        type="file"
+        accept="image/*"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        className="hidden"
+      />
+
+      {/* sleek modern floating action menu */}
       {!isAddingExpense && canEdit && trip.status !== "finished" && (
-        <button
-          onClick={() => {
-            if (trip.members.length === 0) {
-              showAlert(
-                "you need to add some friends to the tab first!",
-                "lonely trip? 🧍",
-              );
-              return;
-            }
-            setIsAddingExpense(true);
-          }}
-          className="fixed bottom-8 right-8 lg:bottom-12 lg:right-12 w-16 h-16 bg-stone-900 text-white rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.4)] flex items-center justify-center text-3xl pb-1 hover:bg-emerald-600 hover:scale-110 active:scale-90 transition-all duration-300 z-40 group"
-        >
-          <span className="group-hover:rotate-90 transition-transform duration-300">
-            +
-          </span>
-        </button>
+        <div className="fixed bottom-8 right-8 lg:bottom-12 lg:right-12 flex flex-col gap-3 z-40 items-end animate-in slide-in-from-bottom-8 duration-500">
+          {/* scan receipt pill */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isScanning}
+            className="flex items-center gap-3 pl-5 pr-2 py-2 bg-white/90 backdrop-blur-md text-stone-600 border-2 border-stone-100 rounded-full shadow-lg hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 active:scale-95 transition-all duration-300 disabled:opacity-50 group"
+          >
+            <span className="text-xs font-black tracking-widest uppercase">
+              upload bill
+            </span>
+            <div className="w-10 h-10 rounded-full bg-stone-100 group-hover:bg-emerald-200 flex items-center justify-center transition-colors">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2.5}
+                  d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2.5}
+                  d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+            </div>
+          </button>
+
+          {/* add manual pill */}
+          <button
+            onClick={() => {
+              if (trip.members.length === 0) {
+                showAlert(
+                  "you need to add some friends to the tab first!",
+                  "lonely trip? 🧍",
+                );
+                return;
+              }
+              setIsAddingExpense(true);
+            }}
+            className="flex items-center gap-3 pl-6 pr-2 py-2 bg-stone-900 text-white rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.3)] hover:bg-emerald-600 active:scale-95 transition-all duration-300 group"
+          >
+            <span className="text-xs font-black tracking-widest uppercase">
+              manual
+            </span>
+            <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors shadow-inner">
+              <svg
+                className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2.5}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+            </div>
+          </button>
+        </div>
+      )}
+
+      {/* cute scanning overlay */}
+      {isScanning && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="w-20 h-20 bg-white rounded-3xl shadow-2xl flex items-center justify-center mb-6 relative overflow-hidden">
+            <div className="text-4xl relative z-10">📝</div>
+            {/* scanning laser animation inline */}
+            <div
+              className="absolute left-0 w-full h-1 bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,1)] z-20"
+              style={{ animation: "scan 1.5s ease-in-out infinite" }}
+            >
+              <style>{`
+                @keyframes scan {
+                  0% { top: 0; opacity: 0; }
+                  10% { opacity: 1; }
+                  90% { opacity: 1; }
+                  100% { top: 100%; opacity: 0; }
+                }
+              `}</style>
+            </div>
+          </div>
+
+          <h3 className="text-xl font-black text-white tracking-wide mb-4">
+            reading receipt...
+          </h3>
+
+          {/* new: sleek progress bar */}
+          <div className="w-48 sm:w-64 bg-stone-800 rounded-full h-2.5 mb-2 overflow-hidden shadow-inner border border-stone-700">
+            <div
+              className="bg-emerald-400 h-full rounded-full transition-all duration-300 ease-out relative"
+              style={{ width: `${scanProgress}%` }}
+            >
+              <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+            </div>
+          </div>
+
+          {/* new: glowing percentage number */}
+          <p className="text-emerald-400 font-black text-sm mb-1 tracking-widest drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]">
+            {scanProgress}%
+          </p>
+
+          <p className="text-stone-400 font-bold text-xs mt-2 uppercase tracking-widest">
+            crunching the numbers
+          </p>
+        </div>
       )}
 
       {/* Bottom Sheet Modal for Expense Form */}
@@ -1332,7 +1534,7 @@ export default function TripDetail() {
               <div className="flex justify-between items-center p-4 bg-stone-50 rounded-2xl border-2 border-stone-100">
                 <div>
                   <h4 className="text-base font-black text-stone-800">
-                    mark trip as finished 🔒
+                    mark trip as settled 🔒
                   </h4>
                   <p className="text-xs font-bold text-stone-500 mt-1">
                     {trip.status === "finished"

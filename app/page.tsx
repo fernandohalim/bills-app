@@ -162,7 +162,7 @@ export default function Home() {
                 {/* 1. Created By Me Toggle */}
                 <button
                   onClick={() => setShowOnlyMine(!showOnlyMine)}
-                  className={`flex items-center justify-center gap-2.5 w-full h-full min-h-[52px] rounded-2xl text-[11px] sm:text-[13px] font-black transition-all border-2 active:scale-95 shadow-sm ${
+                  className={`flex items-center justify-center gap-2.5 w-full h-full min-h-13 rounded-2xl text-[11px] sm:text-[13px] font-black transition-all border-2 active:scale-95 shadow-sm ${
                     showOnlyMine
                       ? "bg-emerald-50 text-emerald-600 border-emerald-200"
                       : "bg-white text-stone-500 border-stone-100 hover:border-stone-200 hover:text-stone-700"
@@ -182,7 +182,7 @@ export default function Home() {
                 <div className="relative w-full h-full">
                   <button
                     onClick={() => setIsSortOpen(!isSortOpen)}
-                    className={`flex items-center justify-center gap-2 w-full h-full min-h-[52px] rounded-2xl text-[11px] sm:text-[13px] font-black transition-all border-2 active:scale-95 shadow-sm bg-white ${
+                    className={`flex items-center justify-center gap-2 w-full h-full min-h-13 rounded-2xl text-[11px] sm:text-[13px] font-black transition-all border-2 active:scale-95 shadow-sm bg-white ${
                       isSortOpen
                         ? "border-emerald-400 text-stone-800 ring-4 ring-emerald-100"
                         : "border-stone-100 text-stone-500 hover:border-stone-200 hover:text-stone-700"
@@ -343,16 +343,33 @@ export default function Home() {
           )}
         </div>
 
-        {/* magical bouncy fab */}
+        {/* sleek modern floating action pill */}
         {!isCreating && (
-          <button
-            onClick={() => setIsCreating(true)}
-            className="fixed bottom-8 right-8 lg:bottom-12 lg:right-12 w-16 h-16 bg-stone-900 text-white rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.4)] flex items-center justify-center text-3xl pb-1 hover:bg-emerald-600 hover:scale-110 active:scale-90 transition-all duration-300 z-40 group"
-          >
-            <span className="group-hover:rotate-90 transition-transform duration-300">
-              +
-            </span>
-          </button>
+          <div className="fixed bottom-8 right-8 lg:bottom-12 lg:right-12 z-40 animate-in slide-in-from-bottom-8 duration-500">
+            <button
+              onClick={() => setIsCreating(true)}
+              className="flex items-center gap-3 pl-6 pr-2 py-2 bg-stone-900 text-white rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.3)] hover:bg-emerald-600 active:scale-95 transition-all duration-300 group"
+            >
+              <span className="text-xs font-black tracking-widest uppercase">
+                new trip
+              </span>
+              <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors shadow-inner">
+                <svg
+                  className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2.5}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+              </div>
+            </button>
+          </div>
         )}
 
         {/* bottom sheet style form overlay */}
