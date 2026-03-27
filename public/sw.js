@@ -1,14 +1,19 @@
 const CACHE_NAME = "nest-cache-v1";
 
+// these are the core files we want to save to the phone instantly
+const CORE_ASSETS = ["/", "/manifest.json", "/icon-192.png", "/icon-512.png"];
+
+// 1. INSTALLATION: cache the core app shell
 self.addEventListener("install", (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(["/", "/manifest.json", "/icon-512.png"]);
+      return cache.addAll(CORE_ASSETS);
     }),
   );
-  self.skipWaiting();
 });
 
+// 2. ACTIVATION: clean up old caches if we update the app
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -22,23 +27,37 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+// 3. THE INTERCEPTOR: how we handle network requests
 self.addEventListener("fetch", (event) => {
-  // skip non-get requests (like our supabase mutations or gemini ai posts)
-  if (event.request.method !== "GET") return;
+  // Ignore API calls to Supabase or Google Auth
+  if (
+    event.request.url.includes("supabase.co") ||
+    event.request.url.includes("google.com") ||
+    event.request.method !== "GET"
+  ) {
+    return; // let the browser handle these normally
+  }
 
+  // For everything else (HTML, CSS, Fonts, Images):
+  // Stale-While-Revalidate Strategy
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // if the network fetch works, clone it into the cache for later
-        const responseClone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseClone);
-        });
-        return response;
-      })
-      .catch(() => {
-        // if offline, serve from cache!
-        return caches.match(event.request);
-      }),
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.match(event.request).then((cachedResponse) => {
+        // fetch the freshest version in the background
+        const fetchedResponse = fetch(event.request)
+          .then((networkResponse) => {
+            // save the new version to the cache for next time
+            cache.put(event.request, networkResponse.clone());
+            return networkResponse;
+          })
+          .catch(() => {
+            // if we are offline and it fails, just return nothing
+          });
+
+        // immediately return the cached version if we have it,
+        // otherwise wait for the network version
+        return cachedResponse || fetchedResponse;
+      });
+    }),
   );
 });
