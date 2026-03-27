@@ -999,42 +999,157 @@ export default function TripDetail() {
                     return (
                       <div
                         key={member.id}
-                        className="p-5 bg-white border-2 border-stone-100 rounded-3xl shadow-sm relative overflow-hidden"
+                        className="p-6 bg-white border-2 border-stone-100 rounded-4xl shadow-sm relative overflow-hidden group hover:border-emerald-200 transition-colors"
                       >
-                        {/* receipt style jagged edge top (decorative css hack) */}
-                        <div className="absolute top-0 left-0 right-0 h-1 flex justify-around opacity-20">
-                          {Array.from({ length: 20 }).map((_, i) => (
+                        {/* receipt style jagged edge top */}
+                        <div className="absolute top-0 left-0 right-0 h-1.5 flex justify-around opacity-20">
+                          {Array.from({ length: 30 }).map((_, i) => (
                             <div
                               key={i}
-                              className="w-2 h-2 bg-stone-400 rotate-45 -mt-1"
+                              className="w-2.5 h-2.5 bg-stone-400 rotate-45 -mt-1.5"
                             ></div>
                           ))}
                         </div>
 
-                        <div className="flex justify-between items-center border-b-2 border-dashed border-stone-200 pb-4 mb-4 mt-1">
-                          <span className="font-extrabold text-lg text-stone-800">
+                        {/* header - isolated context badges */}
+                        <div className="flex justify-between items-center pb-5 mb-5 mt-2 border-b-2 border-stone-100">
+                          <span className="font-black text-xl text-stone-800">
                             {member.name}
                           </span>
                           <span
-                            className={`text-xs font-black px-3 py-1.5 rounded-xl uppercase tracking-wider ${net > 0 ? "bg-emerald-100 text-emerald-700" : net < 0 ? "bg-rose-100 text-rose-700" : "bg-stone-100 text-stone-600"}`}
+                            className={`text-xs font-black px-3.5 py-1.5 rounded-xl uppercase tracking-widest border-2 ${
+                              net > 0
+                                ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                : net < 0
+                                  ? "bg-stone-50 text-stone-500 border-stone-200" // using stone for owes, desaturated
+                                  : "bg-stone-50 text-stone-500 border-stone-200"
+                            }`}
                           >
                             {net > 0 ? "gets " : net < 0 ? "owes " : "even "}
                             {Math.abs(net).toLocaleString()}
                           </span>
                         </div>
-                        <div className="flex flex-col gap-2 text-xs font-bold text-stone-500 uppercase tracking-wide">
-                          <div className="flex justify-between">
-                            <span>total paid out</span>
-                            <span className="text-stone-800 text-sm">
+
+                        {/* summary boxes - SOFTENED EMERALD / STONE BACKGROUNDS */}
+                        <div className="flex gap-3 mb-6">
+                          <div className="flex-1 bg-emerald-50/50 border border-emerald-100 rounded-2xl p-3 flex flex-col gap-1">
+                            <span className="text-[9px] font-black text-emerald-600/60 uppercase tracking-widest">
+                              total paid out
+                            </span>
+                            <span className="font-black text-emerald-700">
                               {Math.round(details.totalPaid).toLocaleString()}
                             </span>
                           </div>
-                          <div className="flex justify-between">
-                            <span>total consumed</span>
-                            <span className="text-stone-800 text-sm">
+                          <div className="flex-1 bg-stone-50 border border-stone-100 rounded-2xl p-3 flex flex-col gap-1">
+                            <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest">
+                              total consumed
+                            </span>
+                            <span className="font-black text-stone-700">
                               {Math.round(details.totalOwed).toLocaleString()}
                             </span>
                           </div>
+                        </div>
+
+                        {/* dashed divider for the receipt look */}
+                        <div className="w-full border-t-2 border-dashed border-stone-200 mb-6"></div>
+
+                        <div className="space-y-6">
+                          {/* PAID ITEMS SECTION */}
+                          {details.paidItems.length > 0 && (
+                            <div className="flex flex-col gap-3">
+                              <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest">
+                                💳 paid for
+                              </span>
+                              <div className="flex flex-col gap-2">
+                                {details.paidItems.map((item, idx) => (
+                                  <div
+                                    key={`paid-${idx}`}
+                                    className="flex justify-between items-start gap-4 text-sm"
+                                  >
+                                    <span
+                                      className={`font-bold flex-1 leading-tight ${item.isNegative ? "text-stone-400 italic" : "text-stone-700"}`}
+                                    >
+                                      {item.title}
+                                    </span>
+                                    {/* individual amount uses neutral soft emerald (if positive) or light stone (if adjustment) */}
+                                    <span
+                                      className={`font-black shrink-0 ${item.isNegative ? "text-stone-400" : "text-emerald-700"}`}
+                                    >
+                                      {item.isNegative ? "-" : "+"}
+                                      {Math.abs(item.amount).toLocaleString()}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* OWED ITEMS SECTION */}
+                          {details.owedItems.length > 0 && (
+                            <div className="flex flex-col gap-3">
+                              <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest">
+                                🍕 consumed
+                              </span>
+                              <div className="flex flex-col gap-3.5">
+                                {details.owedItems.map((item, idx) => (
+                                  <div
+                                    key={`owed-${idx}`}
+                                    className={`flex justify-between items-start gap-4 text-sm ${item.isSettled ? "opacity-60 grayscale" : ""}`}
+                                  >
+                                    <div className="flex flex-col gap-1 flex-1">
+                                      <span
+                                        className={`font-bold text-stone-700 leading-tight ${item.isSettled ? "line-through decoration-stone-400 decoration-2" : ""}`}
+                                      >
+                                        {item.title}
+                                      </span>
+
+                                      {/* map exact sub-items if they exist */}
+                                      {item.subItems &&
+                                        item.subItems.length > 0 && (
+                                          <div className="flex flex-col mt-0.5">
+                                            {item.subItems.map((sub, sIdx) => (
+                                              <span
+                                                key={sIdx}
+                                                className="text-[11px] font-bold text-stone-400 flex gap-1.5 leading-tight"
+                                              >
+                                                <span className="text-stone-300">
+                                                  ↳
+                                                </span>{" "}
+                                                {sub}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
+
+                                      {/* show extra adjustments if they exist - kept amber but soften bg */}
+                                      {item.extra ? (
+                                        <span className="text-[10px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md self-start mt-1">
+                                          +{item.extra.toLocaleString()}{" "}
+                                          adjustment
+                                        </span>
+                                      ) : null}
+                                    </div>
+
+                                    <div className="flex flex-col items-end shrink-0 gap-1">
+                                      {/* individual consumption amount uses simple dark stone-800 */}
+                                      <span
+                                        className={`font-black ${item.isSettled ? "text-stone-400 line-through decoration-2" : "text-stone-800"}`}
+                                      >
+                                        {Math.round(
+                                          item.amount,
+                                        ).toLocaleString()}
+                                      </span>
+                                      {item.isSettled && (
+                                        <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest">
+                                          settled ✓
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
