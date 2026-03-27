@@ -38,4 +38,5 @@ export interface Trip {
   owner_id?: string;
   owner_name?: string;
   status?: string;
+  is_collaborative?: boolean;
 }

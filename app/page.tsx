@@ -10,8 +10,7 @@ import CustomSelect from "@/components/custom-select";
 export default function Home() {
   const router = useRouter();
 
-  const { trips, addTrip, fetchTrips, isLoading } = useTripStore();
-
+  const { user, trips, addTrip, fetchTrips, isLoading } = useTripStore();
   const [newTripName, setNewTripName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -21,6 +20,17 @@ export default function Home() {
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "a_z" | "z_a">(
     "newest",
   );
+
+  const [showOnlyMine, setShowOnlyMine] = useState(false);
+  const [isSortOpen, setIsSortOpen] = useState(false); // NEW: controls our custom dropdown
+
+  // NEW: playful sort options
+  const sortOptions = [
+    { value: "newest", label: "newest first", icon: "✨" },
+    { value: "oldest", label: "oldest first", icon: "⏳" },
+    { value: "a_z", label: "name (a to z)", icon: "🔤" },
+    { value: "z_a", label: "name (z to a)", icon: "🔠" },
+  ];
 
   useEffect(() => {
     fetchTrips();
@@ -58,6 +68,7 @@ export default function Home() {
         : t.status !== "finished",
     )
     .filter((t) => t.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    .filter((t) => (showOnlyMine ? t.owner_id === user?.id : true))
     .sort((a, b) => {
       if (sortBy === "newest")
         return (
@@ -121,17 +132,18 @@ export default function Home() {
 
           {/* chunky search and sort ui */}
           {!isLoading && trips.length > 0 && (
-            <div className="flex gap-2 mb-6">
-              <div className="relative flex-2">
+            <div className="flex flex-col gap-3 mb-8">
+              {/* Row 1: Full-width search */}
+              <div className="relative w-full">
                 <input
                   type="text"
-                  placeholder="find a trip..."
+                  placeholder="search trips..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3.5 text-sm font-bold border-2 border-stone-100 shadow-sm rounded-2xl focus:outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition-all bg-white text-stone-700 placeholder:text-stone-300"
+                  className="w-full pl-12 pr-4 py-4 text-sm font-bold border-2 border-stone-100 shadow-sm rounded-2xl focus:outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition-all bg-white text-stone-700 placeholder:text-stone-300"
                 />
                 <svg
-                  className="w-5 h-5 text-stone-400 absolute left-4 top-3.5"
+                  className="w-5 h-5 text-stone-400 absolute left-4 top-1/2 -translate-y-1/2"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -139,23 +151,107 @@ export default function Home() {
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={2.5}
+                    strokeWidth={3}
                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                   />
                 </svg>
               </div>
-              <CustomSelect
-                value={sortBy}
-                onChange={(val) =>
-                  setSortBy(val as "newest" | "oldest" | "a_z" | "z_a")
-                }
-                options={[
-                  { value: "newest", label: "newest" },
-                  { value: "oldest", label: "oldest" },
-                  { value: "a_z", label: "a - z" },
-                  { value: "z_a", label: "z - a" },
-                ]}
-              />
+
+              {/* Row 2: Symmetrical Grid for Filter & Sort */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* 1. Created By Me Toggle */}
+                <button
+                  onClick={() => setShowOnlyMine(!showOnlyMine)}
+                  className={`flex items-center justify-center gap-2.5 w-full h-full min-h-[52px] rounded-2xl text-[11px] sm:text-[13px] font-black transition-all border-2 active:scale-95 shadow-sm ${
+                    showOnlyMine
+                      ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+                      : "bg-white text-stone-500 border-stone-100 hover:border-stone-200 hover:text-stone-700"
+                  }`}
+                >
+                  <div
+                    className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${
+                      showOnlyMine
+                        ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]"
+                        : "bg-stone-200"
+                    }`}
+                  ></div>
+                  created by me
+                </button>
+
+                {/* 2. Custom Bouncy Sort Dropdown */}
+                <div className="relative w-full h-full">
+                  <button
+                    onClick={() => setIsSortOpen(!isSortOpen)}
+                    className={`flex items-center justify-center gap-2 w-full h-full min-h-[52px] rounded-2xl text-[11px] sm:text-[13px] font-black transition-all border-2 active:scale-95 shadow-sm bg-white ${
+                      isSortOpen
+                        ? "border-emerald-400 text-stone-800 ring-4 ring-emerald-100"
+                        : "border-stone-100 text-stone-500 hover:border-stone-200 hover:text-stone-700"
+                    }`}
+                  >
+                    <span className="opacity-80 text-sm">
+                      {sortOptions.find((o) => o.value === sortBy)?.icon}
+                    </span>
+                    <span>
+                      {sortOptions.find((o) => o.value === sortBy)?.label}
+                    </span>
+                    <svg
+                      className={`w-3.5 h-3.5 text-stone-400 transition-transform duration-300 ${isSortOpen ? "rotate-180 text-emerald-500" : ""}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={3.5}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </button>
+
+                  {/* The Dropdown Menu Menu */}
+                  {isSortOpen && (
+                    <>
+                      {/* invisible overlay to detect clicks outside */}
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setIsSortOpen(false)}
+                      ></div>
+
+                      <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white border-2 border-stone-100 rounded-2xl shadow-xl z-50 overflow-hidden flex flex-col animate-in fade-in slide-in-from-top-2 duration-200">
+                        {sortOptions.map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => {
+                              setSortBy(
+                                option.value as
+                                  | "newest"
+                                  | "oldest"
+                                  | "a_z"
+                                  | "z_a",
+                              );
+                              setIsSortOpen(false);
+                            }}
+                            className={`flex items-center gap-3 w-full px-4 py-3.5 text-left text-[11px] sm:text-[13px] font-black transition-colors ${
+                              sortBy === option.value
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "text-stone-500 hover:bg-stone-50 hover:text-stone-800"
+                            }`}
+                          >
+                            <span className="text-base">{option.icon}</span>
+                            <span className="flex-1">{option.label}</span>
+                            {sortBy === option.value && (
+                              <span className="text-emerald-500 text-lg leading-none">
+                                ✓
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -194,22 +290,31 @@ export default function Home() {
                   onClick={() => router.push(`/trip/${trip.id}`)}
                   className="w-full bg-white p-5 sm:p-6 rounded-3xl shadow-sm border-2 border-stone-100 hover:shadow-md hover:border-emerald-200 transition-all text-left flex justify-between items-center group active:scale-[0.98]"
                 >
-                  <div className="flex flex-col gap-1.5 pr-4 min-w-0">
+                  <div className="flex flex-col gap-2 pr-4 min-w-0">
                     <h3 className="font-extrabold text-stone-800 text-lg sm:text-xl truncate group-hover:text-emerald-700 transition-colors">
                       {trip.name}
                     </h3>
-                    <div className="flex items-center gap-2 text-xs font-bold text-stone-400 uppercase tracking-wider">
-                      <span>
+                    <div className="flex items-center flex-wrap gap-2 text-[10px] sm:text-xs font-bold text-stone-400 uppercase tracking-wider">
+                      {/* author badge */}
+                      <span className="bg-stone-50 border border-stone-100 text-stone-500 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
+                        {trip.owner_id === user?.id ? "you" : trip.owner_name}{" "}
+                        👑
+                      </span>
+
+                      <span className="hidden sm:inline">•</span>
+
+                      <span className="shrink-0">
                         {new Date(trip.createdAt).toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",
                           year: "numeric",
                         })}
                       </span>
+
                       {trip.members && trip.members.length > 0 && (
                         <>
                           <span>•</span>
-                          <span>
+                          <span className="shrink-0">
                             {trip.members.length}{" "}
                             {trip.members.length === 1 ? "member" : "members"}
                           </span>
@@ -259,7 +364,7 @@ export default function Home() {
 
               <div className="px-6 py-5 pt-8 sm:pt-6 border-b-2 border-stone-100 flex justify-between items-center bg-white z-10 shadow-sm">
                 <h2 className="text-2xl font-black text-stone-800">
-                  start a tab 🚀
+                  start a trip 🚀
                 </h2>
                 <button
                   type="button"

@@ -181,7 +181,7 @@ export default function ExpenseForm({
       });
       if (sumPaid !== totalAmountNum) {
         showAlert(
-          `the math isn't mathing. payments must equal ${totalAmountNum.toLocaleString()}`,
+          `payments must equal ${totalAmountNum.toLocaleString()}`,
           "math error 🧮",
         );
         return;
@@ -312,7 +312,7 @@ export default function ExpenseForm({
       <div className="flex flex-col gap-5 p-2">
         <input
           type="text"
-          placeholder="what was it? (e.g. dinner)"
+          placeholder="expense name (?)"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           className="w-full text-3xl font-black bg-transparent border-none placeholder:text-stone-300 focus:outline-none text-stone-800 transition-all focus:scale-[1.02] transform origin-left"
@@ -440,53 +440,78 @@ export default function ExpenseForm({
 
         {(splitType === "equal" || splitType === "adjustment") && (
           <div className="space-y-2.5 animate-in slide-in-from-top-2 duration-300">
-            {members.map((m) => (
-              <div
-                key={m.id}
-                className={`flex items-center justify-between p-3.5 rounded-2xl border-2 transition-all cursor-pointer ${involvedIds.includes(m.id) ? "bg-white border-emerald-400 shadow-sm" : "bg-stone-50 border-stone-100 opacity-60 hover:opacity-100"}`}
-                onClick={() => toggleInvolved(m.id)}
-              >
-                <div className="flex items-center gap-4">
-                  <div
-                    className={`w-6 h-6 shrink-0 rounded-full border-2 flex items-center justify-center transition-all ${involvedIds.includes(m.id) ? "bg-emerald-500 border-emerald-500 text-white scale-110" : "border-stone-300 bg-white"}`}
-                  >
-                    {involvedIds.includes(m.id) && (
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={3}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    )}
+            {members.map((m) => {
+              const isTicked = involvedIds.includes(m.id);
+              const hasAdjustment = !!adjustments[m.id];
+
+              return (
+                <div
+                  key={m.id}
+                  className={`flex items-center justify-between p-3.5 rounded-2xl border-2 transition-all cursor-pointer ${
+                    isTicked
+                      ? "bg-white border-emerald-400 shadow-sm"
+                      : hasAdjustment
+                        ? "bg-white border-stone-300 shadow-sm" // keeps it solid if they have an active adjustment
+                        : "bg-stone-50 border-stone-100 opacity-60 hover:opacity-100"
+                  }`}
+                  onClick={() => toggleInvolved(m.id)}
+                >
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`w-6 h-6 shrink-0 rounded-full border-2 flex items-center justify-center transition-all ${
+                        isTicked
+                          ? "bg-emerald-500 border-emerald-500 text-white scale-110"
+                          : "border-stone-300 bg-white"
+                      }`}
+                    >
+                      {isTicked && (
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={3}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                    <span
+                      className={`text-sm font-bold ${
+                        isTicked || hasAdjustment
+                          ? "text-stone-800"
+                          : "text-stone-500"
+                      }`}
+                    >
+                      {m.name}
+                    </span>
                   </div>
-                  <span
-                    className={`text-sm font-bold ${involvedIds.includes(m.id) ? "text-stone-800" : "text-stone-500"}`}
-                  >
-                    {m.name}
-                  </span>
+
+                  {/* removed the strict involvesId check here so anyone can get an adjustment input */}
+                  {splitType === "adjustment" && (
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="+ extra"
+                      value={adjustments[m.id] || ""}
+                      onChange={(e) =>
+                        handleAdjustmentChange(m.id, e.target.value)
+                      }
+                      onClick={(e) => e.stopPropagation()}
+                      className={`w-20 text-right bg-transparent border-b-2 text-sm font-black focus:outline-none py-1 placeholder:font-bold transition-colors ${
+                        isTicked
+                          ? "border-emerald-100 text-emerald-600 focus:border-emerald-500 placeholder:text-emerald-200"
+                          : "border-stone-200 text-stone-600 focus:border-stone-400 placeholder:text-stone-300"
+                      }`}
+                    />
+                  )}
                 </div>
-                {splitType === "adjustment" && involvedIds.includes(m.id) && (
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="+ extra"
-                    value={adjustments[m.id] || ""}
-                    onChange={(e) =>
-                      handleAdjustmentChange(m.id, e.target.value)
-                    }
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-20 text-right bg-transparent border-b-2 border-emerald-100 text-sm font-black text-emerald-600 focus:outline-none focus:border-emerald-500 py-1 placeholder:font-bold placeholder:text-emerald-200"
-                  />
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -584,7 +609,7 @@ export default function ExpenseForm({
           onClick={onCancel}
           className="flex-1 py-4.5 bg-white border-2 border-stone-200 text-stone-500 rounded-2xl text-base font-black hover:bg-stone-50 hover:border-stone-300 transition-all active:scale-95"
         >
-          nah, cancel
+          cancel
         </button>
         <button type="submit" disabled={isSubmitting} className={newLocal}>
           {isSubmitting ? (
@@ -592,7 +617,7 @@ export default function ExpenseForm({
           ) : initialExpense ? (
             "save changes ✨"
           ) : (
-            "add to tab 🚀"
+            "add to expense list 🚀"
           )}
         </button>
       </div>

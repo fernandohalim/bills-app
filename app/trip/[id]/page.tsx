@@ -49,11 +49,20 @@ export default function TripDetail() {
     subscribeToTrip,
     renameTrip,
     deleteTrip,
+    toggleCollaborative,
     isLoading,
     isSyncing,
   } = useTripStore();
 
   const trip = trips.find((t) => t.id === tripId);
+
+  // 1. move isOwner UP here, so it's calculated before we use it
+  const isOwner = Boolean(
+    user?.id && trip?.owner_id && user.id === trip.owner_id,
+  );
+
+  // 2. safely check trip?.is_collaborative (if trip is undefined, it defaults to false)
+  const canEdit = isOwner || (trip?.is_collaborative ?? false);
 
   useEffect(() => {
     fetchTrip(tripId);
@@ -100,9 +109,6 @@ export default function TripDetail() {
     new Set((trip?.expenses || []).map((e) => e.category || "other")),
   );
 
-  const isOwner = Boolean(
-    user?.id && trip?.owner_id && user.id === trip.owner_id,
-  );
   const [isLinked, setIsLinked] = useState(false);
 
   useEffect(() => {
@@ -518,8 +524,31 @@ export default function TripDetail() {
           <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/30 rounded-full blur-3xl -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-700"></div>
           <div className="absolute bottom-0 left-0 w-32 h-32 bg-emerald-400/20 rounded-full blur-2xl -ml-10 -mb-10 group-hover:translate-x-4 transition-transform duration-700"></div>
 
-          <div className="px-4 py-1.5 bg-white/10 backdrop-blur-md rounded-full text-xs font-bold tracking-widest uppercase mb-4 relative z-10 border border-white/20">
-            {trip.status === "finished" ? "🔒 vault locked" : "💸 active tab"}
+          <div className="flex flex-wrap justify-center gap-2 mb-4 relative z-10">
+            <div className="px-4 py-1.5 bg-white/10 backdrop-blur-md rounded-full text-xs font-bold tracking-widest uppercase border border-white/20">
+              {trip.status === "finished" ? "🔒 late trip" : "💸 active trip"}
+            </div>
+
+            {/* NEW: Collaboration status badge so viewers know the rules! */}
+            {trip.status !== "finished" && (
+              <div
+                className={`px-4 py-1.5 backdrop-blur-md rounded-full text-xs font-bold tracking-widest uppercase border flex items-center gap-1.5 transition-colors ${
+                  trip.is_collaborative
+                    ? "bg-emerald-400/30 border-emerald-300/50 text-white shadow-[0_0_10px_rgba(52,211,153,0.2)]"
+                    : "bg-black/20 border-white/10 text-stone-200"
+                }`}
+              >
+                {trip.is_collaborative ? (
+                  <>
+                    <span>🤝</span> open to edit
+                  </>
+                ) : (
+                  <>
+                    <span>👀</span> view only
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           <h1 className="text-3xl font-extrabold tracking-tight mb-2 relative z-10">
@@ -553,11 +582,41 @@ export default function TripDetail() {
           </div>
         </div>
 
+        {isOwner && (
+          <div className="bg-white border-2 border-stone-100 rounded-3xl p-5 shadow-sm mb-10 flex items-center justify-between group hover:border-emerald-200 transition-colors animate-in slide-in-from-bottom-4 duration-500">
+            <div className="flex flex-col">
+              <span className="font-black text-stone-800 text-base flex items-center gap-2">
+                🌐 collaborative mode
+              </span>
+              <span className="text-[11px] font-bold text-stone-400 mt-1 uppercase tracking-wider">
+                {trip.is_collaborative
+                  ? "anyone with the link can add expenses"
+                  : "only you can add expenses"}
+              </span>
+            </div>
+
+            <button
+              onClick={() =>
+                toggleCollaborative(trip.id, !trip.is_collaborative)
+              }
+              className={`relative w-14 h-8 rounded-full transition-colors duration-300 ease-in-out shadow-inner focus:outline-none focus:ring-4 focus:ring-emerald-100 ${
+                trip.is_collaborative ? "bg-emerald-500" : "bg-stone-200"
+              }`}
+            >
+              <div
+                className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+                  trip.is_collaborative ? "translate-x-6" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+        )}
+
         {/* cute crew section with colorful pills */}
         <section className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
           <div className="flex justify-between items-end mb-4 px-1">
             <h2 className="text-xl font-extrabold text-stone-800">
-              the crew 🤘
+              members 🤘
             </h2>
             <span className="text-sm font-bold text-stone-400 bg-stone-100 px-3 py-1 rounded-full">
               {trip.members.length}
@@ -578,7 +637,7 @@ export default function TripDetail() {
                     {getInitials(member.name)}
                   </div>
                   <span className="text-stone-700">{member.name}</span>
-                  {isOwner && trip.status !== "finished" && (
+                  {canEdit && trip.status !== "finished" && (
                     <button
                       onClick={() => handleRemoveMember(member.id, member.name)}
                       className="w-6 h-6 flex items-center justify-center text-stone-300 hover:text-white hover:bg-rose-500 rounded-full transition-all active:scale-90 ml-1"
@@ -591,7 +650,7 @@ export default function TripDetail() {
             })}
           </div>
 
-          {isOwner && trip.status !== "finished" && (
+          {canEdit && trip.status !== "finished" && (
             <form onSubmit={handleAddMember} className="flex gap-2 mt-5">
               <input
                 type="text"
@@ -614,7 +673,7 @@ export default function TripDetail() {
         <section className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
           <div className="flex justify-between items-end mb-4 px-1">
             <h2 className="text-xl font-extrabold text-stone-800">
-              the tab 🧾
+              expenses/bills 🧾
             </h2>
           </div>
 
@@ -687,7 +746,17 @@ export default function TripDetail() {
                       className="w-full flex justify-between items-center p-4 sm:p-5 text-left active:bg-stone-50 transition-colors gap-3"
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="mb-1">
+                        <div className="mb-1 flex flex-col">
+                          <span className="text-[10px] font-black text-stone-400 tracking-widest uppercase mb-0.5">
+                            {new Date(exp.expenseDate).toLocaleDateString(
+                              "en-US",
+                              {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              },
+                            )}
+                          </span>
                           <p className="text-base sm:text-lg font-extrabold text-stone-800 truncate">
                             {exp.title}
                           </p>
@@ -887,7 +956,7 @@ export default function TripDetail() {
                           )}
                         </div>
 
-                        {isOwner && trip.status !== "finished" && (
+                        {canEdit && trip.status !== "finished" && (
                           <div className="flex gap-3">
                             <button
                               onClick={() => {
@@ -985,9 +1054,7 @@ export default function TripDetail() {
                 onClick={() => setShowLedger(!showLedger)}
                 className="w-full py-4 bg-white border-2 border-stone-200 rounded-2xl text-sm font-extrabold text-stone-600 hover:bg-stone-50 hover:border-stone-300 transition-all shadow-sm active:scale-[0.98]"
               >
-                {showLedger
-                  ? "hide the boring math ↑"
-                  : "show me the boring math ↓"}
+                {showLedger ? "hide ledger details ↑" : "show ledger details ↓"}
               </button>
 
               {showLedger && (
@@ -1169,7 +1236,7 @@ export default function TripDetail() {
       </div>
 
       {/* magical bouncy FAB for new expense */}
-      {!isAddingExpense && isOwner && trip.status !== "finished" && (
+      {!isAddingExpense && canEdit && trip.status !== "finished" && (
         <button
           onClick={() => {
             if (trip.members.length === 0) {
@@ -1198,7 +1265,7 @@ export default function TripDetail() {
 
             <div className="px-6 py-5 pt-8 sm:pt-6 border-b-2 border-stone-100 flex justify-between items-center bg-white z-10 shadow-sm">
               <h2 className="text-2xl font-black text-stone-800">
-                {editingExpense ? "edit it ✏️" : "new tab 💸"}
+                {editingExpense ? "edit expense ✏️" : "new expense 💸"}
               </h2>
               <button
                 onClick={() => {
@@ -1265,12 +1332,12 @@ export default function TripDetail() {
               <div className="flex justify-between items-center p-4 bg-stone-50 rounded-2xl border-2 border-stone-100">
                 <div>
                   <h4 className="text-base font-black text-stone-800">
-                    lock trip 🔒
+                    mark trip as finished 🔒
                   </h4>
                   <p className="text-xs font-bold text-stone-500 mt-1">
                     {trip.status === "finished"
-                      ? "locked tight."
-                      : "open for business."}
+                      ? "re-open the trip?"
+                      : "mark as late trip?"}
                   </p>
                 </div>
                 <button
@@ -1297,7 +1364,7 @@ export default function TripDetail() {
                 onClick={handleFullTripDelete}
                 className="w-full py-4 bg-white border-2 border-rose-200 text-rose-600 hover:bg-rose-500 hover:text-white rounded-2xl text-sm font-black transition-all active:scale-95 shadow-sm"
               >
-                🧨 nuke entire trip
+                🧨 delete entire trip
               </button>
             </div>
           </div>

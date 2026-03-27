@@ -22,6 +22,7 @@ interface TripStore {
   toggleExpenseSettled: (tripId: string, expenseId: string, memberId: string) => Promise<void>;
   subscribeToTrip: (tripId: string) => () => void;
   isSyncing: boolean;
+  toggleCollaborative: (tripId: string, isCollaborative: boolean) => Promise<void>;
 }
 
 interface SupabaseExpenseRow {
@@ -36,7 +37,7 @@ interface SupabaseExpenseRow {
   settled_shares?: Record<string, boolean>;
   expense_date: string;
   created_at: string;
-  category: string; // <-- NEW
+  category: string;
 }
 
 interface SupabaseTripRow {
@@ -47,10 +48,10 @@ interface SupabaseTripRow {
   created_at: string;
   owner_id: string;
   owner_name: string;
-  status: string; // <-- NEW
+  status: string;
+  is_collaborative: boolean;
 }
 
-// helper to translate database snake_case to our typescript camelCase
 const mapExpense = (exp: SupabaseExpenseRow): Expense => ({
   id: exp.id,
   title: exp.title,
@@ -63,7 +64,7 @@ const mapExpense = (exp: SupabaseExpenseRow): Expense => ({
   settledShares: exp.settled_shares,
   expenseDate: exp.expense_date,
   createdAt: exp.created_at,
-  category: exp.category || 'other' // <-- NEW
+  category: exp.category || 'other'
 });
 
 export const useTripStore = create<TripStore>((set, get) => ({
@@ -108,7 +109,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
 
     const mappedTrips = combinedTrips.map(t => ({
        id: t.id, name: t.name, date: t.date || "", currency: t.currency || "IDR", 
-       createdAt: t.created_at, owner_id: t.owner_id, owner_name: t.owner_name, status: t.status || 'ongoing', members: [], expenses: []
+       createdAt: t.created_at, owner_id: t.owner_id, owner_name: t.owner_name, status: t.status || 'ongoing', members: [], expenses: [], is_collaborative: t.is_collaborative || false,
     }));
 
     set({ trips: mappedTrips, isLoading: false});
@@ -139,6 +140,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
         status: tripRes.data.status || 'ongoing', // <-- NEW
         members: membersRes.data || [],
         expenses: (expensesRes.data || []).map(mapExpense),
+        is_collaborative: tripRes.data.is_collaborative || false,
       };
 
     set((state) => {
@@ -177,6 +179,15 @@ export const useTripStore = create<TripStore>((set, get) => ({
     set({ isSyncing: false });
 
   },
+
+  toggleCollaborative: async (tripId, isCollaborative) => {
+  set({ isSyncing: true });
+  set((state) => ({ 
+    trips: state.trips.map(t => t.id === tripId ? { ...t, is_collaborative: isCollaborative } : t) 
+  }));
+  await supabase.from("trips").update({ is_collaborative: isCollaborative }).eq("id", tripId);
+  set({ isSyncing: false });
+},
 
   deleteTrip: async (tripId) => {
     set({ isSyncing: true });
