@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTripStore } from "@/store/useTripStore";
+import { useAlertStore } from "@/store/useAlertStore";
 import { v4 as uuidv4 } from "uuid";
 import ProfileMenu from "@/components/profile-menu";
-import CustomSelect from "@/components/custom-select";
 
 export default function Home() {
   const router = useRouter();
-
+  const showAlert = useAlertStore((state) => state.showAlert);
   const { user, trips, addTrip, fetchTrips, isLoading } = useTripStore();
   const [newTripName, setNewTripName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
@@ -22,9 +22,8 @@ export default function Home() {
   );
 
   const [showOnlyMine, setShowOnlyMine] = useState(false);
-  const [isSortOpen, setIsSortOpen] = useState(false); // NEW: controls our custom dropdown
+  const [isSortOpen, setIsSortOpen] = useState(false);
 
-  // NEW: playful sort options
   const sortOptions = [
     { value: "newest", label: "newest first", icon: "✨" },
     { value: "oldest", label: "oldest first", icon: "⏳" },
@@ -89,9 +88,35 @@ export default function Home() {
         {/* cozy header */}
         <div className="flex justify-between items-start mb-8 pt-4">
           <div className="flex flex-col gap-1">
-            <h1 className="text-4xl font-black tracking-tight text-emerald-800 drop-shadow-sm">
-              nest.
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-4xl font-black tracking-tight text-emerald-800 drop-shadow-sm">
+                nest.
+              </h1>
+              {/* 1. The "nest." intro hint */}
+              <button
+                onClick={() =>
+                  showAlert(
+                    "welcome to nest! 🌿 use this to track group expenses for trips, house bills, or even just a shared dinner. we do the math so you can stay friends.",
+                    "what is nest? 🐣",
+                  )
+                }
+                className="w-5 h-5 mt-1 rounded-full text-stone-300 hover:text-stone-500 hover:bg-stone-100 flex items-center justify-center transition-all focus:outline-none"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={3}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </button>
+            </div>
             <p className="text-sm text-stone-500 font-bold tracking-wide">
               split expenses, keep the peace 🌱
             </p>
@@ -110,23 +135,73 @@ export default function Home() {
             ></div>
             <button
               onClick={() => setViewMode("ongoing")}
-              className={`flex-1 py-3 text-sm z-10 rounded-2xl transition-all active:scale-95 ${
+              className={`flex-1 py-3 text-sm z-10 rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
                 viewMode === "ongoing"
                   ? "font-black text-stone-800"
                   : "font-bold text-stone-500 hover:text-stone-700"
               }`}
             >
               ongoing
+              {/* inline info icon */}
+              <div
+                onClick={(e) => {
+                  e.stopPropagation(); // stops the tab from switching when clicked!
+                  showAlert(
+                    "trips with active spending that haven't been fully paid back yet.",
+                    "ongoing trips 🏃‍♂️",
+                  );
+                }}
+                className="w-5 h-5 rounded-full flex items-center justify-center text-stone-300 hover:bg-stone-200 hover:text-stone-500 transition-colors"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={3}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
             </button>
             <button
               onClick={() => setViewMode("finished")}
-              className={`flex-1 py-3 text-sm z-10 rounded-2xl transition-all active:scale-95 ${
+              className={`flex-1 py-3 text-sm z-10 rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
                 viewMode === "finished"
                   ? "font-black text-stone-800"
                   : "font-bold text-stone-500 hover:text-stone-700"
               }`}
             >
               settled up 🤝
+              {/* inline info icon */}
+              <div
+                onClick={(e) => {
+                  e.stopPropagation(); // stops the tab from switching when clicked!
+                  showAlert(
+                    "trips where everyone has paid their debts and the trip is closed.",
+                    "settled trips 🤝",
+                  );
+                }}
+                className="w-5 h-5 rounded-full flex items-center justify-center text-stone-300 hover:bg-stone-200 hover:text-stone-500 transition-colors"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={3}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
             </button>
           </div>
 
@@ -162,20 +237,45 @@ export default function Home() {
                 {/* 1. Created By Me Toggle */}
                 <button
                   onClick={() => setShowOnlyMine(!showOnlyMine)}
-                  className={`flex items-center justify-center gap-2.5 w-full h-full min-h-13 rounded-2xl text-[11px] sm:text-[13px] font-black transition-all border-2 active:scale-95 shadow-sm ${
+                  className={`flex items-center justify-center gap-2 w-full h-full min-h-13 rounded-2xl text-[11px] sm:text-[13px] font-black transition-all border-2 active:scale-95 shadow-sm ${
                     showOnlyMine
                       ? "bg-emerald-50 text-emerald-600 border-emerald-200"
                       : "bg-white text-stone-500 border-stone-100 hover:border-stone-200 hover:text-stone-700"
                   }`}
                 >
                   <div
-                    className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${
+                    className={`w-2.5 h-2.5 rounded-full shrink-0 transition-colors duration-300 ${
                       showOnlyMine
                         ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]"
                         : "bg-stone-200"
                     }`}
                   ></div>
                   created by me
+                  {/* inline info icon */}
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      showAlert(
+                        "only show trips where you are the owner.",
+                        "created by me 👑",
+                      );
+                    }}
+                    className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${showOnlyMine ? "text-emerald-400 hover:bg-emerald-100 hover:text-emerald-600" : "text-stone-300 hover:bg-stone-100 hover:text-stone-500"}`}
+                  >
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={3}
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  </div>
                 </button>
 
                 {/* 2. Custom Bouncy Sort Dropdown */}

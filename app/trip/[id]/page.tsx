@@ -7,7 +7,7 @@ import { useAlertStore } from "@/store/useAlertStore";
 import { v4 as uuidv4 } from "uuid";
 import ExpenseForm from "@/components/expense-form";
 import { calculateSettlements } from "@/lib/settlements";
-import { Expense } from "@/lib/types";
+import { Expense, ExpenseItem } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 import CustomSelect from "@/components/custom-select";
 import CameraScanner from "@/components/camera-scanner";
@@ -183,6 +183,7 @@ export default function TripDetail() {
   };
 
   const settlements = trip ? calculateSettlements(trip) : [];
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
 
   type MemberDetail = {
     totalPaid: number;
@@ -432,6 +433,11 @@ export default function TripDetail() {
     setEditingExpense(undefined);
   };
 
+  interface RawReceiptItem {
+    name: string;
+    price: number;
+  }
+
   const processReceiptFile = async (file: File) => {
     setScanProgress(0);
     setIsScanning(true);
@@ -455,16 +461,21 @@ export default function TripDetail() {
       if (!res.ok) throw new Error("failed to scan");
       const data = await res.json();
 
-      const formattedItems = data.items.map((item: any) => ({
-        id: uuidv4(),
-        name: item.name,
-        price: item.price,
-        assignedTo: [],
-      }));
+      const formattedItems: ExpenseItem[] = data.items.map(
+        (item: RawReceiptItem) => ({
+          id: uuidv4(),
+          name: item.name,
+          price: item.price,
+          assignedTo: [],
+        }),
+      );
 
       const totalScannedAmount =
         data.totalAmount ||
-        formattedItems.reduce((sum: number, item: any) => sum + item.price, 0);
+        formattedItems.reduce(
+          (sum: number, item: ExpenseItem) => sum + item.price,
+          0,
+        );
 
       let parsedDate = new Date().toISOString();
       if (data.date) {
@@ -549,8 +560,46 @@ export default function TripDetail() {
     );
   };
 
+  const getRawDebts = () => {
+    if (!trip) return [];
+
+    const raw: { from: string; to: string; amount: number }[] = [];
+
+    trip.expenses.forEach((exp) => {
+      const payers = Object.keys(exp.paidBy || {});
+      if (payers.length === 0) return;
+      const mainPayerId = payers[0];
+      const mainPayer = trip.members.find((m) => m.id === mainPayerId);
+
+      if (!mainPayer) return;
+
+      Object.entries(exp.owedBy || {}).forEach(([oweId, amount]) => {
+        if (oweId !== mainPayerId && amount > 0) {
+          // ignore if they already settled this specific item
+          if (exp.settledShares && exp.settledShares[oweId]) return;
+
+          const debtor = trip.members.find((m) => m.id === oweId);
+          if (!debtor) return;
+
+          const existing = raw.find(
+            (d) => d.from === debtor.name && d.to === mainPayer.name,
+          );
+          if (existing) {
+            existing.amount += amount;
+          } else {
+            raw.push({ from: debtor.name, to: mainPayer.name, amount });
+          }
+        }
+      });
+    });
+
+    return raw;
+  };
+
+  const rawDebts = getRawDebts();
+
   return (
-    <main className="flex min-h-screen flex-col items-center p-6 bg-[#fdfbf7] pb-32 text-stone-800 font-sans selection:bg-emerald-200 selection:text-emerald-900">
+    <main className="flex min-h-screen flex-col items-center p-6 bg-[#fdfbf7] pb-40 text-stone-800 font-sans selection:bg-emerald-200 selection:text-emerald-900">
       <div className="w-full max-w-md relative">
         {/* top navigation - bouncy buttons */}
         <div className="flex justify-between items-center mb-6">
@@ -861,10 +910,36 @@ export default function TripDetail() {
         {/* cute crew section with colorful pills */}
         <section className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
           <div className="flex justify-between items-end mb-4 px-1">
-            <h2 className="text-xl font-extrabold text-stone-800">
-              members 🤘
-            </h2>
-            <span className="text-sm font-bold text-stone-400 bg-stone-100 px-3 py-1 rounded-full">
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-extrabold text-stone-800">
+                members 🤘
+              </h2>
+              <button
+                onClick={() =>
+                  showAlert(
+                    "just type their names! anyone you add here is just a local profile for this trip.",
+                    "how members work 👥",
+                  )
+                }
+                className="w-5 h-5 rounded-full bg-stone-200 text-stone-500 hover:bg-stone-300 hover:text-stone-700 flex items-center justify-center transition-colors focus:outline-none"
+              >
+                <svg
+                  className="w-3 h-3"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={3}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <span className="text-sm font-bold text-stone-400 bg-stone-100 px-3 py-1 rounded-full shrink-0">
               {trip.members.length}
             </span>
           </div>
@@ -918,9 +993,34 @@ export default function TripDetail() {
         {/* expenses section */}
         <section className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
           <div className="flex justify-between items-end mb-4 px-1">
-            <h2 className="text-xl font-extrabold text-stone-800">
-              expenses/bills 🧾
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-extrabold text-stone-800">
+                expenses/bills 🧾
+              </h2>
+              <button
+                onClick={() =>
+                  showAlert(
+                    "add your group receipts here! inside, you can choose to split the bill equally, type in exact amounts, or scan the receipt and assign individual items.",
+                    "how expenses work 💸",
+                  )
+                }
+                className="w-5 h-5 rounded-full bg-stone-200 text-stone-500 hover:bg-stone-300 hover:text-stone-700 flex items-center justify-center transition-colors focus:outline-none"
+              >
+                <svg
+                  className="w-3 h-3"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={3}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {trip.expenses.length > 0 && (
@@ -1233,13 +1333,33 @@ export default function TripDetail() {
           </div>
         </section>
 
-        {/*  ledger */}
+        {/* ledger */}
         {trip.expenses.length > 0 && (
           <section className="mt-14 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300">
             <div className="flex justify-between items-end mb-4 px-1">
-              <h2 className="text-xl font-extrabold text-stone-800">
-                who pays who 🤝
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-extrabold text-stone-800">
+                  who pays who 🤝
+                </h2>
+                <button
+                  onClick={() => setShowSettlementModal(true)}
+                  className="w-6 h-6 rounded-full bg-stone-200 text-stone-500 hover:bg-stone-300 hover:text-stone-700 flex items-center justify-center transition-colors"
+                >
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={3}
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {settlements.length === 0 ? (
@@ -1296,7 +1416,7 @@ export default function TripDetail() {
               </div>
             )}
 
-            {/* transparent detailed ledger logic is back! */}
+            {/* transparent detailed ledger logic */}
             <div className="mt-8">
               <button
                 onClick={() => setShowLedger(!showLedger)}
@@ -1307,6 +1427,7 @@ export default function TripDetail() {
 
               {showLedger && (
                 <div className="space-y-4 mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                  {/* ... YOUR EXISTING LEDGER MAPPING LOGIC GOES HERE (no changes needed) ... */}
                   {trip.members.map((member) => {
                     const details = memberDetails[member.id];
                     if (
@@ -1321,9 +1442,8 @@ export default function TripDetail() {
                     return (
                       <div
                         key={member.id}
-                        className="p-6 bg-white border-2 border-stone-100 rounded-4xl shadow-sm relative overflow-hidden group hover:border-emerald-200 transition-colors"
+                        className="p-6 bg-white border-2 border-stone-100 rounded-4xl shadow-sm relative overflow-hidden hover:border-emerald-200 transition-colors"
                       >
-                        {/* receipt style jagged edge top */}
                         <div className="absolute top-0 left-0 right-0 h-1.5 flex justify-around opacity-20">
                           {Array.from({ length: 30 }).map((_, i) => (
                             <div
@@ -1332,27 +1452,17 @@ export default function TripDetail() {
                             ></div>
                           ))}
                         </div>
-
-                        {/* header - isolated context badges */}
                         <div className="flex justify-between items-center pb-5 mb-5 mt-2 border-b-2 border-stone-100">
                           <span className="font-black text-xl text-stone-800">
                             {member.name}
                           </span>
                           <span
-                            className={`text-xs font-black px-3.5 py-1.5 rounded-xl uppercase tracking-widest border-2 ${
-                              net > 0
-                                ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-                                : net < 0
-                                  ? "bg-stone-50 text-stone-500 border-stone-200" // using stone for owes, desaturated
-                                  : "bg-stone-50 text-stone-500 border-stone-200"
-                            }`}
+                            className={`text-xs font-black px-3.5 py-1.5 rounded-xl uppercase tracking-widest border-2 ${net > 0 ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-stone-50 text-stone-500 border-stone-200"}`}
                           >
                             {net > 0 ? "gets " : net < 0 ? "owes " : "even "}
                             {Math.abs(net).toLocaleString()}
                           </span>
                         </div>
-
-                        {/* summary boxes - SOFTENED EMERALD / STONE BACKGROUNDS */}
                         <div className="flex gap-3 mb-6">
                           <div className="flex-1 bg-emerald-50/50 border border-emerald-100 rounded-2xl p-3 flex flex-col gap-1">
                             <span className="text-[9px] font-black text-emerald-600/60 uppercase tracking-widest">
@@ -1371,12 +1481,9 @@ export default function TripDetail() {
                             </span>
                           </div>
                         </div>
-
-                        {/* dashed divider for the receipt look */}
                         <div className="w-full border-t-2 border-dashed border-stone-200 mb-6"></div>
-
                         <div className="space-y-6">
-                          {/* PAID ITEMS SECTION */}
+                          {/* PAID ITEMS */}
                           {details.paidItems.length > 0 && (
                             <div className="flex flex-col gap-3">
                               <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest">
@@ -1393,7 +1500,6 @@ export default function TripDetail() {
                                     >
                                       {item.title}
                                     </span>
-                                    {/* individual amount uses neutral soft emerald (if positive) or light stone (if adjustment) */}
                                     <span
                                       className={`font-black shrink-0 ${item.isNegative ? "text-stone-400" : "text-emerald-700"}`}
                                     >
@@ -1405,8 +1511,7 @@ export default function TripDetail() {
                               </div>
                             </div>
                           )}
-
-                          {/* OWED ITEMS SECTION */}
+                          {/* OWED ITEMS */}
                           {details.owedItems.length > 0 && (
                             <div className="flex flex-col gap-3">
                               <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest">
@@ -1424,8 +1529,6 @@ export default function TripDetail() {
                                       >
                                         {item.title}
                                       </span>
-
-                                      {/* map exact sub-items if they exist */}
                                       {item.subItems &&
                                         item.subItems.length > 0 && (
                                           <div className="flex flex-col mt-0.5">
@@ -1442,8 +1545,6 @@ export default function TripDetail() {
                                             ))}
                                           </div>
                                         )}
-
-                                      {/* show extra adjustments if they exist - kept amber but soften bg */}
                                       {item.extra ? (
                                         <span className="text-[10px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md self-start mt-1">
                                           +{item.extra.toLocaleString()}{" "}
@@ -1451,9 +1552,7 @@ export default function TripDetail() {
                                         </span>
                                       ) : null}
                                     </div>
-
                                     <div className="flex flex-col items-end shrink-0 gap-1">
-                                      {/* individual consumption amount uses simple dark stone-800 */}
                                       <span
                                         className={`font-black ${item.isSettled ? "text-stone-400 line-through decoration-2" : "text-stone-800"}`}
                                       >
@@ -1479,6 +1578,129 @@ export default function TripDetail() {
                 </div>
               )}
             </div>
+
+            {/* THE BEFORE/AFTER EXPLANATION MODAL */}
+            {showSettlementModal && (
+              <div className="fixed inset-0 z-100 flex items-center justify-center px-4">
+                {/* Backdrop */}
+                <div
+                  className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm transition-opacity"
+                  onClick={() => setShowSettlementModal(false)}
+                />
+
+                {/* Modal Content */}
+                <div className="relative bg-white w-full max-w-md rounded-4xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                  <div className="p-6 sm:p-8">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-2xl">
+                        ✨
+                      </div>
+                      <button
+                        onClick={() => setShowSettlementModal(false)}
+                        className="w-8 h-8 bg-stone-100 text-stone-400 hover:bg-stone-200 hover:text-stone-700 rounded-full flex items-center justify-center transition-colors"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2.5}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+
+                    <h3 className="text-2xl font-black text-stone-800 leading-tight mb-2">
+                      debt simplification
+                    </h3>
+                    <p className="text-stone-500 font-bold text-sm leading-relaxed mb-6">
+                      nest automatically optimizes the group&apos;s debts.
+                      instead of everyone paying each other back for every
+                      single receipt, we minimize the total number of
+                      transactions.
+                    </p>
+
+                    <div className="space-y-6">
+                      {/* Before State */}
+                      <div className="bg-stone-50 rounded-2xl p-4 border border-stone-100">
+                        <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-3 block">
+                          before (raw debts)
+                        </span>
+                        {rawDebts.length === 0 ? (
+                          <span className="text-sm font-bold text-stone-400">
+                            no debts to show.
+                          </span>
+                        ) : (
+                          <div className="flex flex-col gap-2">
+                            {rawDebts.map((debt, i) => (
+                              <div
+                                key={i}
+                                className="flex justify-between items-center text-xs"
+                              >
+                                <span className="font-bold text-stone-600">
+                                  {debt.from} owes {debt.to}
+                                </span>
+                                <span className="font-black text-stone-400">
+                                  {Math.round(debt.amount).toLocaleString()}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex justify-center -my-3 relative z-10">
+                        <div className="w-8 h-8 bg-white border border-stone-200 rounded-full flex items-center justify-center text-stone-400 shadow-sm">
+                          ↓
+                        </div>
+                      </div>
+
+                      {/* After State */}
+                      <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
+                        <span className="text-[10px] font-black text-emerald-600/70 uppercase tracking-widest mb-3 block">
+                          after (optimized by nest)
+                        </span>
+                        {settlements.length === 0 ? (
+                          <span className="text-sm font-bold text-emerald-600">
+                            everything is settled!
+                          </span>
+                        ) : (
+                          <div className="flex flex-col gap-2">
+                            {settlements.map((s, i) => (
+                              <div
+                                key={i}
+                                className="flex justify-between items-center text-xs"
+                              >
+                                <span className="font-bold text-emerald-800">
+                                  {s.from.name} pays {s.to.name}
+                                </span>
+                                <span className="font-black text-emerald-600">
+                                  {Math.round(s.amount).toLocaleString()}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-stone-50 border-t border-stone-100">
+                    <button
+                      onClick={() => setShowSettlementModal(false)}
+                      className="w-full py-3.5 bg-stone-900 text-white font-extrabold rounded-full hover:bg-stone-800 active:scale-[0.98] transition-all"
+                    >
+                      got it
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
         )}
       </div>
@@ -1495,6 +1717,17 @@ export default function TripDetail() {
       {/* sleek modern floating action menu */}
       {!isAddingExpense && canEdit && trip.status !== "finished" && (
         <div className="fixed bottom-8 right-8 lg:bottom-12 lg:right-12 flex flex-col gap-3 z-40 items-end animate-in slide-in-from-bottom-8 duration-500">
+          {/* NEW: Context hook for brand new trips! disappears after the first expense */}
+          {trip.expenses.length === 0 && (
+            <div className="animate-bounce mb-1 mr-2">
+              <div className="bg-stone-800 text-stone-200 text-[10px] font-black tracking-widest uppercase px-4 py-2.5 rounded-2xl shadow-xl relative border border-stone-700">
+                scan or add manual ✨
+                {/* little speech bubble tail pointing to the buttons */}
+                <div className="absolute -bottom-1.5 right-6 w-3 h-3 bg-stone-800 border-b border-r border-stone-700 rotate-45 rounded-sm"></div>
+              </div>
+            </div>
+          )}
+
           {/* ultra-premium scan receipt pill */}
           <button
             onClick={() => {

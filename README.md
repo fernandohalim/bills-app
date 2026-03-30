@@ -1,10 +1,15 @@
 <div align="center">
   <img src="public/icon-512.png" alt="nest logo" width="120" />
   
-  <h1>🐣 nest.</h1>
-  <p><b>split expenses, keep the peace 🌱</b></p>
+  # 🐣 nest.
+  **split expenses, keep the peace 🌱**
 
-[Live Demo](https://nest-app.vercel.app) • [Report a Bug](https://github.com/fernandohalim/nest-app/issues)
+  [![Next.js](https://img.shields.io/badge/Next.js_16-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+  [![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_v4-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+  [![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com/)
+  [![Gemini AI](https://img.shields.io/badge/Gemini_2.5_Flash-8E75B2?style=flat-square&logo=googlebard&logoColor=white)](https://aistudio.google.com/)
+
+  [Live Demo](https://nest-app.vercel.app) • [Report a Bug](https://github.com/fernandohalim/nest-app/issues)
 
 </div>
 
@@ -14,23 +19,23 @@
 
 ## ✨ features
 
-- 📸 **ai receipt scanner:** just upload a photo of your bill, and nest will magically extract the items, prices, merchant, and date using gemini 2.5 flash.
-- 🍕 **exact line-item splitting:** split the tab equally, by custom adjustments, or exactly by who consumed what (with tax and tip distributed fairly!).
-- 🤝 **optimized settlements:** the transparent ledger calculates the absolute minimum number of transactions needed to settle up the whole group.
-- 💸 **one-tap settle up:** easily mark debts as paid and watch the ledger balance itself perfectly to zero.
-- 📱 **bouncy & playful ui:** a highly interactive, custom-built interface that makes dealing with money actually feel fun.
-- 🔒 **secure & synced:** real-time cloud syncing backed by supabase authentication and row-level security.
+* 📸 **ai receipt scanner:** skip the manual data entry. upload a photo of your bill, and nest magically extracts the items, prices, merchant, and date using **gemini 2.5 flash**.
+* 🍕 **exact line-item splitting:** split the tab equally, by custom adjustments, or exactly by who consumed what (with tax and tip distributed fairly!).
+* 🤝 **optimized settlements:** our transparent ledger calculates the absolute minimum number of transactions needed to settle up the whole group.
+* 💸 **one-tap settle up:** easily mark debts as paid and watch the ledger balance itself perfectly to zero.
+* 📱 **bouncy & playful ui:** a highly interactive, custom-built interface that makes dealing with money actually feel fun.
+* 🔒 **secure & synced:** real-time cloud syncing backed by supabase authentication and row-level security.
 
 ## 🛠️ tech stack
 
 this project was built with a modern, high-performance stack:
 
-- **framework:** [Next.js 16](https://nextjs.org/) (App Router)
-- **library:** [React 19](https://react.dev/)
-- **styling:** [TailwindCSS v4](https://tailwindcss.com/)
-- **database & auth:** [Supabase](https://supabase.com/)
-- **state management:** [Zustand](https://zustand-demo.pmnd.rs/)
-- **ai vision:** [Google Gemini 2.5 Flash](https://aistudio.google.com/)
+* **framework:** [Next.js 16](https://nextjs.org/) (App Router)
+* **library:** [React 19](https://react.dev/)
+* **styling:** [TailwindCSS v4](https://tailwindcss.com/)
+* **database & auth:** [Supabase](https://supabase.com/)
+* **state management:** [Zustand](https://zustand-demo.pmnd.rs/)
+* **ai vision:** [Google Gemini 2.5 Flash](https://aistudio.google.com/)
 
 ## 🚀 getting started
 
@@ -45,9 +50,6 @@ cd nest-app
 
 # install the dependencies
 npm install
-
-# copy the env file
-cp .env.example .env.local
 
 # add your supabase keys and gemini api key to .env.local
 # NEXT_PUBLIC_SUPABASE_URL=...

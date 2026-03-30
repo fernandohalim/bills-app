@@ -57,6 +57,7 @@ interface SupabaseTripRow {
   date: string;
   currency: string;
   created_at: string;
+  updated_at: string;
   owner_id: string;
   owner_name: string;
   status: string;
@@ -132,7 +133,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
       date: t.date || "",
       currency: t.currency || "IDR",
       createdAt: t.created_at,
-      updatedAt: (t as any).updated_at || t.created_at,
+      updatedAt: t.updated_at || t.created_at,
       owner_id: t.owner_id,
       owner_name: t.owner_name,
       status: t.status || "ongoing",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 interface CameraScannerProps {
   onCapture: (file: File) => void;
@@ -15,19 +15,41 @@ export default function CameraScanner({
 }: CameraScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null); // holds the active stream so we can kill it when switching
+
   const [error, setError] = useState<string>("");
   const [isReady, setIsReady] = useState(false);
   const [flash, setFlash] = useState(false);
 
-  useEffect(() => {
-    let stream: MediaStream | null = null;
+  // new state for device switching
+  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
+  const [currentCameraIndex, setCurrentCameraIndex] = useState(0);
 
-    const startCamera = async () => {
+  // wrap in useCallback so it's safe to use inside useEffect
+  const stopStream = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+  }, []);
+
+  // wrap in useCallback and add stopStream as a dependency
+  const startCamera = useCallback(
+    async (deviceId?: string) => {
+      stopStream();
+      setIsReady(false);
+      setError("");
+
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
+        const constraints: MediaStreamConstraints = {
           audio: false,
-        });
+          video: deviceId
+            ? { deviceId: { exact: deviceId } }
+            : { facingMode: "environment" },
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        streamRef.current = stream;
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -35,35 +57,94 @@ export default function CameraScanner({
             setIsReady(true);
           };
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("camera access failed:", err);
-        if (err.name === "NotAllowedError") {
-          setError(
-            "camera access denied. please enable it in your settings or upload a file.",
-          );
-        } else if (err.name === "NotFoundError") {
-          setError("no camera found on this device.");
+
+        if (err instanceof Error || err instanceof DOMException) {
+          if (err.name === "NotAllowedError") {
+            setError(
+              "camera access denied. please enable it in your settings or upload a file.",
+            );
+          } else if (err.name === "NotFoundError") {
+            setError("no camera found on this device.");
+          } else {
+            setError(
+              "failed to start camera. you can still upload a file instead.",
+            );
+          }
         } else {
-          setError(
-            "failed to start camera. you can still upload a file instead.",
-          );
+          setError("failed to start camera due to an unknown error.");
         }
       }
-    };
+    },
+    [stopStream],
+  );
 
-    startCamera();
+  // initialize devices on mount
+  useEffect(() => {
+    const initDevices = async () => {
+      try {
+        const initialStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+          audio: false,
+        });
+        initialStream.getTracks().forEach((track) => track.stop());
 
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter((d) => d.kind === "videoinput");
+
+        setCameras(videoDevices);
+
+        if (videoDevices.length > 0) {
+          const isBackCamera = (label: string) =>
+            label.toLowerCase().includes("back") ||
+            label.toLowerCase().includes("environment");
+          const isUltraWide = (label: string) =>
+            label.toLowerCase().includes("ultra") ||
+            label.toLowerCase().includes("0.5");
+
+          let startingIndex = 0;
+          const backCams = videoDevices.filter((d) => isBackCamera(d.label));
+
+          if (backCams.length > 0) {
+            const mainBack = backCams.find((d) => !isUltraWide(d.label));
+            if (mainBack) {
+              startingIndex = videoDevices.findIndex(
+                (d) => d.deviceId === mainBack.deviceId,
+              );
+            } else {
+              startingIndex = videoDevices.findIndex(
+                (d) => d.deviceId === backCams[0].deviceId,
+              );
+            }
+          }
+
+          setCurrentCameraIndex(startingIndex);
+          startCamera(videoDevices[startingIndex].deviceId);
+        } else {
+          startCamera();
+        }
+      } catch {
+        // FIX 1: removed the unused 'err' variable here!
+        startCamera();
       }
     };
-  }, []);
+
+    initDevices();
+
+    return () => stopStream();
+  }, [startCamera, stopStream]);
+
+  const cycleCamera = () => {
+    if (cameras.length <= 1) return;
+    const nextIndex = (currentCameraIndex + 1) % cameras.length;
+    setCurrentCameraIndex(nextIndex);
+    startCamera(cameras[nextIndex].deviceId);
+  };
 
   const handleSnap = () => {
     if (!videoRef.current || !canvasRef.current) return;
 
-    // trigger the flash animation!
     setFlash(true);
     setTimeout(() => setFlash(false), 150);
 
@@ -87,7 +168,6 @@ export default function CameraScanner({
           type: "image/jpeg",
         });
 
-        // Add a tiny delay so the user sees the flash before it closes
         setTimeout(() => {
           onCapture(file);
         }, 200);
@@ -98,17 +178,13 @@ export default function CameraScanner({
   };
 
   return (
-    // Outer Wrapper: Full screen on mobile, blurred backdrop on desktop
-    <div className="fixed inset-0 z-[100] bg-black sm:bg-stone-900/90 sm:backdrop-blur-sm flex flex-col sm:items-center sm:justify-center animate-in fade-in duration-300">
-      {/* Inner Device Container: Forces a mobile aspect ratio on desktop */}
-      <div className="w-full h-full sm:max-w-sm sm:h-[800px] sm:max-h-[90vh] sm:rounded-[2.5rem] sm:border-8 sm:border-stone-800 overflow-hidden relative flex flex-col bg-black sm:shadow-2xl">
-        {/* Flash Overlay */}
+    <div className="fixed inset-0 z-100 bg-black sm:bg-stone-900/90 sm:backdrop-blur-sm flex flex-col sm:items-center sm:justify-center animate-in fade-in duration-300">
+      <div className="w-full h-full sm:max-w-sm sm:h-200 sm:max-h-[90vh] sm:rounded-[2.5rem] sm:border-8 sm:border-stone-800 overflow-hidden relative flex flex-col bg-black sm:shadow-2xl">
         <div
-          className={`absolute inset-0 bg-white z-[60] pointer-events-none transition-opacity duration-150 ${flash ? "opacity-100" : "opacity-0"}`}
+          className={`absolute inset-0 bg-white z-60 pointer-events-none transition-opacity duration-150 ${flash ? "opacity-100" : "opacity-0"}`}
         />
 
-        {/* top bar */}
-        <div className="absolute top-0 left-0 right-0 p-6 pt-safe flex justify-between items-center z-20 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
+        <div className="absolute top-0 left-0 right-0 p-6 pt-safe flex justify-between items-center z-20 bg-linear-to-b from-black/80 via-black/40 to-transparent">
           <span className="text-white text-xs font-black tracking-widest uppercase px-3 py-1.5 bg-black/50 backdrop-blur-md rounded-full border border-white/10">
             scan receipt
           </span>
@@ -132,7 +208,6 @@ export default function CameraScanner({
           </button>
         </div>
 
-        {/* camera viewfinder */}
         <div className="flex-1 relative flex items-center justify-center bg-stone-950 overflow-hidden">
           {error ? (
             <div className="p-8 text-center flex flex-col items-center gap-4 z-10">
@@ -159,19 +234,14 @@ export default function CameraScanner({
                 className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${isReady ? "opacity-100" : "opacity-0"}`}
               />
 
-              {/* Ultra-Premium Receipt Frame Guide */}
               {isReady && (
                 <div className="absolute inset-x-8 top-24 bottom-24 pointer-events-none flex items-center justify-center z-10">
-                  {/* The dark overlay outside the frame (creates a focus window) */}
-                  <div className="absolute -inset-[1000px] border-[1000px] border-black/40 rounded-[1024px]"></div>
-
-                  {/* The 4 active corners */}
+                  <div className="absolute -inset-250 border-1000 border-black/40 rounded-[1024px]"></div>
                   <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-emerald-400 rounded-tl-2xl opacity-80"></div>
                   <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-emerald-400 rounded-tr-2xl opacity-80"></div>
                   <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-emerald-400 rounded-bl-2xl opacity-80"></div>
                   <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-emerald-400 rounded-br-2xl opacity-80"></div>
 
-                  {/* Pulsing Instruction Badge */}
                   <div className="absolute bottom-6 px-4 py-2 bg-black/60 backdrop-blur-md rounded-full border border-white/10 animate-pulse">
                     <span className="text-[10px] font-medium tracking-wide text-stone-200">
                       Align receipt within frame
@@ -185,9 +255,7 @@ export default function CameraScanner({
 
         <canvas ref={canvasRef} className="hidden" />
 
-        {/* bottom controls */}
-        <div className="h-40 bg-black flex items-center justify-around px-8 pb-safe z-20 relative before:absolute before:inset-x-0 before:-top-24 before:h-24 before:bg-gradient-to-t before:from-black before:to-transparent before:pointer-events-none">
-          {/* fallback gallery button */}
+        <div className="h-40 bg-black flex items-center justify-around px-8 pb-safe z-20 relative before:absolute before:inset-x-0 before:-top-24 before:h-24 before:bg-linear-to-t before:from-black before:to-transparent before:pointer-events-none">
           <button
             onClick={onUploadFallback}
             className="w-12 h-12 rounded-full bg-stone-800 border border-stone-700 flex items-center justify-center text-stone-300 hover:bg-stone-700 hover:text-white active:scale-95 transition-all shadow-lg"
@@ -207,20 +275,40 @@ export default function CameraScanner({
             </svg>
           </button>
 
-          {/* glowing shutter button */}
           <button
             onClick={handleSnap}
             disabled={!isReady || !!error}
             className="relative w-20 h-20 flex items-center justify-center group active:scale-90 transition-transform duration-200 disabled:opacity-50 disabled:active:scale-100"
           >
             <div className="absolute inset-0 rounded-full border-[3px] border-emerald-400/40 group-hover:border-emerald-400 group-hover:scale-110 transition-all duration-300 shadow-[0_0_20px_rgba(52,211,153,0.3)]"></div>
-            <div className="w-[60px] h-[60px] rounded-full bg-white shadow-lg group-hover:bg-stone-200 transition-colors flex items-center justify-center z-10">
+            <div className="w-15 h-15 rounded-full bg-white shadow-lg group-hover:bg-stone-200 transition-colors flex items-center justify-center z-10">
               <div className="w-12 h-12 rounded-full border-2 border-stone-300/60"></div>
             </div>
           </button>
 
-          {/* empty div to balance flex spacing */}
-          <div className="w-12 h-12"></div>
+          {/* DYNAMIC CYCLE BUTTON */}
+          {cameras.length > 1 ? (
+            <button
+              onClick={cycleCamera}
+              className="w-12 h-12 rounded-full bg-stone-800/80 backdrop-blur-md border border-stone-700 flex items-center justify-center text-stone-300 hover:bg-stone-700 hover:text-white active:scale-95 transition-all shadow-lg"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2.5}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+            </button>
+          ) : (
+            <div className="w-12 h-12"></div>
+          )}
         </div>
       </div>
     </div>

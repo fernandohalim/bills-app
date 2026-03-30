@@ -331,6 +331,14 @@ export default function ExpenseForm({
 
   const newLocal =
     "flex-[2] py-4.5 bg-stone-900 text-white rounded-2xl text-base font-black hover:bg-emerald-600 transition-all shadow-xl shadow-stone-900/20 hover:shadow-emerald-600/30 active:scale-95 disabled:bg-stone-300 disabled:shadow-none flex justify-center items-center";
+
+  const totalAmountNum = parseFloat(amount.toString().replace(/,/g, "")) || 0;
+  const currentPaidSum = Object.values(payers).reduce(
+    (sum, val) => sum + (parseFloat(val.toString().replace(/,/g, "")) || 0),
+    0,
+  );
+  const mathDiff = totalAmountNum - currentPaidSum;
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-8">
       {/* Hero Inputs */}
@@ -405,7 +413,7 @@ export default function ExpenseForm({
             className="w-full"
           />
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 animate-in fade-in duration-300">
             {members.map((m) => (
               <div
                 key={m.id}
@@ -424,43 +432,96 @@ export default function ExpenseForm({
                 />
               </div>
             ))}
+
+            {/* 3. Multiple Payers Math Helper */}
+            <div className="mt-4 pt-4 border-t-2 border-dashed border-stone-100">
+              {totalAmountNum === 0 ? (
+                <p className="text-[11px] font-bold text-stone-400 text-center py-2">
+                  enter a total amount above first! 👆
+                </p>
+              ) : mathDiff === 0 ? (
+                <div className="flex items-center justify-center gap-2 text-emerald-600 bg-emerald-50 py-2.5 rounded-xl animate-in zoom-in-95 duration-300">
+                  <span className="text-lg">✨</span>
+                  <span className="text-xs font-black uppercase tracking-widest">
+                    perfectly matches total!
+                  </span>
+                </div>
+              ) : mathDiff > 0 ? (
+                <div className="flex items-center justify-between text-amber-600 bg-amber-50 px-4 py-2.5 rounded-xl transition-colors">
+                  <span className="text-[10px] font-black uppercase tracking-widest">
+                    left to assign:
+                  </span>
+                  <span className="text-sm font-black">
+                    {mathDiff.toLocaleString()}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between text-rose-600 bg-rose-50 px-4 py-2.5 rounded-xl transition-colors animate-pulse">
+                  <span className="text-[10px] font-black uppercase tracking-widest">
+                    overpaid by:
+                  </span>
+                  <span className="text-sm font-black">
+                    {Math.abs(mathDiff).toLocaleString()}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
 
       {/* Split logic */}
       <div className="flex flex-col gap-5">
-        <span className="text-sm font-black text-stone-800 uppercase tracking-wide px-1">
-          how are we splitting? 🍕
-        </span>
+        <div className="flex flex-col gap-2">
+          <div className="flex justify-between items-center px-1">
+            <span className="text-sm font-black text-stone-800 uppercase tracking-wide">
+              how are we splitting? 🍕
+            </span>
+          </div>
 
-        <div className="bg-stone-100 p-1.5 rounded-3xl flex gap-1 relative overflow-hidden">
-          {/* Animated slider background (pseudo element approach via tailwind) */}
-          <div
-            className={`absolute top-1.5 bottom-1.5 w-[32%] bg-white rounded-2xl shadow-sm transition-all duration-300 ease-out ${splitType === "equal" ? "left-[1.5%]" : splitType === "exact" ? "left-[34%]" : "left-[66.5%]"}`}
-          ></div>
+          <div className="bg-stone-100 p-1.5 rounded-3xl flex gap-1 relative overflow-hidden">
+            {/* Animated slider background (pseudo element approach via tailwind) */}
+            <div
+              className={`absolute top-1.5 bottom-1.5 w-[32%] bg-white rounded-2xl shadow-sm transition-all duration-300 ease-out ${splitType === "equal" ? "left-[1.5%]" : splitType === "exact" ? "left-[34%]" : "left-[66.5%]"}`}
+            ></div>
 
-          <button
-            type="button"
-            onClick={() => setSplitType("equal")}
-            className={`flex-1 py-3 text-xs z-10 rounded-2xl transition-all active:scale-95 ${splitType === "equal" ? "font-black text-stone-800" : "font-bold text-stone-500 hover:text-stone-700"}`}
-          >
-            equally
-          </button>
-          <button
-            type="button"
-            onClick={() => setSplitType("exact")}
-            className={`flex-1 py-3 text-xs z-10 rounded-2xl transition-all active:scale-95 ${splitType === "exact" ? "font-black text-stone-800" : "font-bold text-stone-500 hover:text-stone-700"}`}
-          >
-            by item
-          </button>
-          <button
-            type="button"
-            onClick={() => setSplitType("adjustment")}
-            className={`flex-1 py-3 text-xs z-10 rounded-2xl transition-all active:scale-95 ${splitType === "adjustment" ? "font-black text-stone-800" : "font-bold text-stone-500 hover:text-stone-700"}`}
-          >
-            custom
-          </button>
+            <button
+              type="button"
+              onClick={() => setSplitType("equal")}
+              className={`flex-1 py-3 text-xs z-10 rounded-2xl transition-all active:scale-95 ${splitType === "equal" ? "font-black text-stone-800" : "font-bold text-stone-500 hover:text-stone-700"}`}
+            >
+              equally
+            </button>
+            <button
+              type="button"
+              onClick={() => setSplitType("exact")}
+              className={`flex-1 py-3 text-xs z-10 rounded-2xl transition-all active:scale-95 ${splitType === "exact" ? "font-black text-stone-800" : "font-bold text-stone-500 hover:text-stone-700"}`}
+            >
+              by item
+            </button>
+            <button
+              type="button"
+              onClick={() => setSplitType("adjustment")}
+              className={`flex-1 py-3 text-xs z-10 rounded-2xl transition-all active:scale-95 ${splitType === "adjustment" ? "font-black text-stone-800" : "font-bold text-stone-500 hover:text-stone-700"}`}
+            >
+              custom
+            </button>
+          </div>
+
+          {/* 1. Dynamic Split Explainer */}
+          <div className="px-2 min-h-5">
+            <p
+              key={splitType}
+              className="text-[11px] font-bold text-stone-400 animate-in fade-in slide-in-from-top-1 duration-300"
+            >
+              {splitType === "equal" &&
+                "the total is divided perfectly evenly among everyone selected."}
+              {splitType === "exact" &&
+                "assign specific receipt items to people. (tips/tax are auto-calculated!)"}
+              {splitType === "adjustment" &&
+                "split equally, but add specific extra amounts for certain people."}
+            </p>
+          </div>
         </div>
 
         {(splitType === "equal" || splitType === "adjustment") && (
@@ -542,116 +603,145 @@ export default function ExpenseForm({
 
         {splitType === "exact" && (
           <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-            {items.map((item) => (
-              <div
-                key={item.id}
-                className="border-2 border-stone-100 rounded-3xl bg-white shadow-sm flex flex-col group overflow-hidden"
-              >
-                {/* Inputs Row - No extra padding, highly optimized widths */}
-                <div className="flex items-center w-full bg-stone-50 border-b-2 border-stone-100">
-                  <input
-                    type="text"
-                    placeholder="what is it?"
-                    value={item.name}
-                    onChange={(e) =>
-                      handleItemChange(item.id, "name", e.target.value)
-                    }
-                    className="flex-6 min-w-0 text-sm font-black bg-transparent px-4 py-3 sm:py-4 focus:outline-none focus:bg-white transition-all border-r-2 border-stone-100"
-                  />
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="price"
-                    value={item.price ? formatNumber(item.price) : ""}
-                    onChange={(e) =>
-                      handleItemChange(item.id, "price", e.target.value)
-                    }
-                    className="flex-4 min-w-0 text-sm font-black text-right bg-transparent px-3 py-3 sm:py-4 focus:outline-none focus:bg-white transition-all text-emerald-600 border-r-2 border-stone-100"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveItem(item.id)}
-                    className="w-10 sm:w-12 shrink-0 flex items-center justify-center self-stretch bg-transparent text-stone-400 hover:bg-rose-500 hover:text-white transition-all font-black text-lg"
+            {/* 2. Secret Multiplier Hint */}
+            <div className="flex items-center gap-3 p-3 bg-emerald-50/50 border border-emerald-100 rounded-2xl animate-in fade-in zoom-in-95 duration-500 delay-150">
+              <span className="text-xl">✨</span>
+              <p className="text-[11px] font-bold text-emerald-700 leading-snug">
+                <span className="font-black">pro tip:</span> tap a name multiple
+                times to give them a larger share! (great for when someone eats
+                3 slices of pizza 🍕)
+              </p>
+            </div>
+
+            {items.map((item) => {
+              const isOrphaned =
+                item.name.trim() !== "" &&
+                item.price > 0 &&
+                item.assignedTo.length === 0;
+
+              return (
+                <div
+                  key={item.id}
+                  className={`border-2 rounded-3xl bg-white shadow-sm flex flex-col group overflow-hidden transition-colors duration-300 ${
+                    isOrphaned
+                      ? "border-rose-100 shadow-rose-100"
+                      : "border-stone-100"
+                  }`}
+                >
+                  {/* Inputs Row */}
+                  <div
+                    className={`flex items-center w-full border-b-2 transition-colors duration-300 ${isOrphaned ? "bg-rose-50/30 border-rose-100" : "bg-stone-50 border-stone-100"}`}
                   >
-                    ×
-                  </button>
-                </div>
+                    <input
+                      type="text"
+                      placeholder="what is it?"
+                      value={item.name}
+                      onChange={(e) =>
+                        handleItemChange(item.id, "name", e.target.value)
+                      }
+                      className={`flex-6 min-w-0 text-sm font-black bg-transparent px-4 py-3 sm:py-4 focus:outline-none focus:bg-white transition-all border-r-2 ${isOrphaned ? "border-rose-100" : "border-stone-100"}`}
+                    />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="price"
+                      value={item.price ? formatNumber(item.price) : ""}
+                      onChange={(e) =>
+                        handleItemChange(item.id, "price", e.target.value)
+                      }
+                      className={`flex-4 min-w-0 text-sm font-black text-right bg-transparent px-3 py-3 sm:py-4 focus:outline-none focus:bg-white transition-all text-emerald-600 border-r-2 ${isOrphaned ? "border-rose-100" : "border-stone-100"}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveItem(item.id)}
+                      className="w-10 sm:w-12 shrink-0 flex items-center justify-center self-stretch bg-transparent text-stone-400 hover:bg-rose-500 hover:text-white transition-all font-black text-lg"
+                    >
+                      ×
+                    </button>
+                  </div>
 
-                {/* member tag row - minimal padding to let it breathe without looking disconnected */}
-                <div className="flex flex-wrap gap-1.5 sm:gap-2 px-3 py-3 sm:px-4 sm:py-3 bg-white">
-                  {members.map((m) => {
-                    // count how many times this member is in the array
-                    const weight = item.assignedTo.filter(
-                      (id) => id === m.id,
-                    ).length;
-                    const isAssigned = weight > 0;
+                  {/* member tag row */}
+                  <div className="flex flex-col px-3 py-3 sm:px-4 sm:py-3 bg-white">
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                      {members.map((m) => {
+                        const weight = item.assignedTo.filter(
+                          (id) => id === m.id,
+                        ).length;
+                        const isAssigned = weight > 0;
 
-                    if (isAssigned) {
-                      return (
-                        <div
-                          key={m.id}
-                          className="flex items-stretch bg-stone-800 text-white rounded-full shadow-md shadow-stone-800/20 -translate-y-px overflow-hidden transition-all"
-                        >
-                          {/* main button to increase weight */}
+                        if (isAssigned) {
+                          return (
+                            <div
+                              key={m.id}
+                              className="flex items-stretch bg-stone-800 text-white rounded-full shadow-md shadow-stone-800/20 -translate-y-px overflow-hidden transition-all"
+                            >
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  increaseItemMemberWeight(item.id, m.id)
+                                }
+                                className="text-[10px] sm:text-[11px] font-black pl-3.5 sm:pl-4 pr-2 py-1.5 sm:py-2 transition-colors hover:bg-stone-700 active:bg-stone-600 flex items-center gap-1.5"
+                              >
+                                {m.name}
+                                {weight > 1 && (
+                                  <span className="bg-emerald-500 text-white px-1.5 py-0.5 rounded-md text-[9px] font-black leading-none flex items-center">
+                                    x{weight}
+                                  </span>
+                                )}
+                              </button>
+
+                              <div className="w-px bg-stone-600 my-1"></div>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  decreaseItemMemberWeight(item.id, m.id)
+                                }
+                                className="px-2 hover:bg-rose-500 hover:text-white text-stone-300 transition-colors active:bg-rose-600 flex items-center justify-center"
+                              >
+                                <svg
+                                  className="w-3 h-3"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={3}
+                                    d="M20 12H4"
+                                  />
+                                </svg>
+                              </button>
+                            </div>
+                          );
+                        }
+
+                        return (
                           <button
+                            key={m.id}
                             type="button"
                             onClick={() =>
                               increaseItemMemberWeight(item.id, m.id)
                             }
-                            className="text-[10px] sm:text-[11px] font-black pl-3.5 sm:pl-4 pr-2 py-1.5 sm:py-2 transition-colors hover:bg-stone-700 active:bg-stone-600 flex items-center gap-1.5"
+                            className="text-[10px] sm:text-[11px] font-black px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full transition-all active:scale-90 bg-stone-50 text-stone-400 border-2 border-stone-100 hover:bg-stone-200"
                           >
                             {m.name}
-                            {weight > 1 && (
-                              <span className="bg-emerald-500 text-white px-1.5 py-0.5 rounded-md text-[9px] font-black leading-none flex items-center">
-                                x{weight}
-                              </span>
-                            )}
                           </button>
+                        );
+                      })}
+                    </div>
 
-                          {/* separator */}
-                          <div className="w-px bg-stone-600 my-1"></div>
-
-                          {/* minus button to decrease weight */}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              decreaseItemMemberWeight(item.id, m.id)
-                            }
-                            className="px-2 hover:bg-rose-500 hover:text-white text-stone-300 transition-colors active:bg-rose-600 flex items-center justify-center"
-                          >
-                            <svg
-                              className="w-3 h-3"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={3}
-                                d="M20 12H4"
-                              />
-                            </svg>
-                          </button>
-                        </div>
-                      );
-                    }
-
-                    // unassigned default pill
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => increaseItemMemberWeight(item.id, m.id)}
-                        className="text-[10px] sm:text-[11px] font-black px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full transition-all active:scale-90 bg-stone-50 text-stone-400 border-2 border-stone-100 hover:bg-stone-200"
-                      >
-                        {m.name}
-                      </button>
-                    );
-                  })}
+                    {/* tiny subtle warning text if orphaned */}
+                    {isOrphaned && (
+                      <span className="text-[10px] font-bold text-rose-500 mt-2 ml-1 animate-in fade-in duration-300">
+                        ↑ tap a name to assign this item!
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             <button
               type="button"
@@ -663,6 +753,7 @@ export default function ExpenseForm({
           </div>
         )}
 
+        {/* Existing exact sum warning */}
         {splitType === "exact" && itemsSum > 0 && difference !== 0 && (
           <div className="p-5 bg-amber-50 border-2 border-amber-100 rounded-3xl text-sm font-bold text-amber-800 flex items-start gap-3 animate-in fade-in slide-in-from-bottom-2">
             <span className="text-2xl leading-none">💡</span>

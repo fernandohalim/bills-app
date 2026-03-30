@@ -1,0 +1,5 @@
+=> create new [.env.local] files
+=> .env required values below
+NEXT_PUBLIC_SUPABASE_URL=https://your-supabase-url.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+GEMINI_API_KEY=your-gemini-api-key

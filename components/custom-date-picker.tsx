@@ -59,8 +59,11 @@ export default function CustomDatePicker({
     };
   });
 
+  const [prevValue, setPrevValue] = useState(value);
+
   // sync time if it changes from outside (like an ai scan)
-  useEffect(() => {
+  if (value !== prevValue) {
+    setPrevValue(value);
     if (value) {
       const d = new Date(value);
       if (!isNaN(d.getTime())) {
@@ -74,7 +77,7 @@ export default function CustomDatePicker({
         });
       }
     }
-  }, [value]);
+  }
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
