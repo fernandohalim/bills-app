@@ -391,27 +391,9 @@ export default function Home() {
                     ? "where are we heading next?"
                     : "no settled trips yet."}
               </p>
-              {!searchQuery && viewMode === "ongoing" && trips.length === 0 && (
-                <div className="absolute -bottom-8 right-6 text-emerald-400 animate-bounce">
-                  <svg
-                    className="w-10 h-10 rotate-120 drop-shadow-sm"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2.5}
-                      d="M14 5l7 7m0 0l-7 7m7-7H3"
-                    />
-                  </svg>
-                </div>
-              )}
             </div>
           ) : (
             <div className="space-y-4">
-              {/* USE DISPLAYED TRIPS HERE INSTEAD OF PROCESSED TRIPS */}
               {displayedTrips.map((trip) => (
                 <button
                   key={trip.id}
@@ -483,7 +465,7 @@ export default function Home() {
           )}
         </div>
 
-        {/* NEW: Cozy Footer that opens About Modal */}
+        {/* Cozy Footer that opens About Modal */}
         <div className="mt-12 mb-8 text-center animate-in fade-in duration-1000 delay-300 pb-16">
           <button
             onClick={() => setIsAboutOpen(true)}
