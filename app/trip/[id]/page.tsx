@@ -242,14 +242,20 @@ export default function TripDetail() {
             let myBaseSum = 0;
 
             myItems.forEach((i) => {
-              const share =
-                i.assignedTo.length > 1 ? `(1/${i.assignedTo.length})` : "";
-              const baseShare = i.price / i.assignedTo.length;
-              myBaseSum += baseShare;
-              originalSum += baseShare;
+              const userShares = i.assignedTo.filter(
+                (userId) => userId === id,
+              ).length;
+              const totalShares = i.assignedTo.length;
 
-              const priceStr = Math.round(baseShare).toLocaleString();
-              subItems.push(`${i.name} ${share} • ${priceStr}`.trim());
+              const shareText =
+                totalShares > 1 ? ` (${userShares}/${totalShares})` : "";
+              const myBaseShare = (i.price / totalShares) * userShares;
+
+              myBaseSum += myBaseShare;
+              originalSum += myBaseShare;
+
+              const priceStr = Math.round(myBaseShare).toLocaleString();
+              subItems.push(`${i.name}${shareText} • ${priceStr}`.trim());
             });
 
             const itemsSum = exp.items.reduce(
@@ -1297,11 +1303,16 @@ export default function TripDetail() {
                                       .filter((i) =>
                                         i.assignedTo.includes(memberId),
                                       )
-                                      .reduce(
-                                        (acc, i) =>
-                                          acc + i.price / i.assignedTo.length,
-                                        0,
-                                      )
+                                      .reduce((acc, i) => {
+                                        const userShares = i.assignedTo.filter(
+                                          (id) => id === memberId,
+                                        ).length;
+                                        return (
+                                          acc +
+                                          (i.price / i.assignedTo.length) *
+                                            userShares
+                                        );
+                                      }, 0)
                                   : 0;
                               const memberDiffShare =
                                 amount - memberBaseSum - (extra || 0);
@@ -1368,7 +1379,7 @@ export default function TripDetail() {
                                   {/* 🔥 BOTTOM ROW: Indented Details 🔥 */}
                                   {((exp.splitType === "exact" && exp.items) ||
                                     extra) && (
-                                    <div className="pl-[44px] w-full flex flex-col gap-1 mt-2">
+                                    <div className="pl-11 w-full flex flex-col gap-1 mt-2">
                                       {exp.splitType === "exact" &&
                                         exp.items && (
                                           <>
@@ -1377,8 +1388,21 @@ export default function TripDetail() {
                                                 i.assignedTo.includes(memberId),
                                               )
                                               .map((i) => {
-                                                const baseShare =
-                                                  i.price / i.assignedTo.length;
+                                                const userShares =
+                                                  i.assignedTo.filter(
+                                                    (id) => id === memberId,
+                                                  ).length;
+                                                const totalShares =
+                                                  i.assignedTo.length;
+                                                const myBaseShare =
+                                                  (i.price / totalShares) *
+                                                  userShares;
+
+                                                const shareText =
+                                                  totalShares > 1
+                                                    ? ` (${userShares}/${totalShares})`
+                                                    : "";
+
                                                 return (
                                                   <span
                                                     key={i.id}
@@ -1386,10 +1410,11 @@ export default function TripDetail() {
                                                   >
                                                     <span className="truncate">
                                                       ↳ {i.name}
+                                                      {shareText}
                                                     </span>
                                                     <span className="shrink-0 text-stone-300">
                                                       {Math.round(
-                                                        baseShare,
+                                                        myBaseShare,
                                                       ).toLocaleString()}
                                                     </span>
                                                   </span>
