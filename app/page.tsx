@@ -699,7 +699,7 @@ export default function Home() {
 
                   {/* 4. LinkedIn */}
                   <a
-                    href="https://linkedin.com/in/fernando-halim"
+                    href="https://linkedin.com/in/fernando-halimm"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full relative overflow-hidden flex items-center justify-between p-4 bg-white border-2 border-stone-100 rounded-2xl hover:border-blue-300 hover:shadow-md transition-all active:scale-[0.98] group"
