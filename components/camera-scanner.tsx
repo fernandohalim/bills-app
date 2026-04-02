@@ -1,12 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-
-interface CameraScannerProps {
-  onCapture: (file: File) => void;
-  onClose: () => void;
-  onUploadFallback: () => void;
-}
+import { CameraScannerProps } from "@/lib/types";
 
 export default function CameraScanner({
   onCapture,
@@ -25,7 +20,6 @@ export default function CameraScanner({
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [currentCameraIndex, setCurrentCameraIndex] = useState(0);
 
-  // wrap in useCallback so it's safe to use inside useEffect
   const stopStream = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
@@ -33,7 +27,6 @@ export default function CameraScanner({
     }
   }, []);
 
-  // wrap in useCallback and add stopStream as a dependency
   const startCamera = useCallback(
     async (deviceId?: string) => {
       stopStream();
@@ -80,7 +73,6 @@ export default function CameraScanner({
     [stopStream],
   );
 
-  // initialize devices on mount
   useEffect(() => {
     const initDevices = async () => {
       try {
@@ -125,7 +117,6 @@ export default function CameraScanner({
           startCamera();
         }
       } catch {
-        // FIX 1: removed the unused 'err' variable here!
         startCamera();
       }
     };
@@ -286,7 +277,7 @@ export default function CameraScanner({
             </div>
           </button>
 
-          {/* DYNAMIC CYCLE BUTTON */}
+          {/* dynamic cycle btn */}
           {cameras.length > 1 ? (
             <button
               onClick={cycleCamera}

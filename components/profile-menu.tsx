@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useTripStore } from "@/store/useTripStore";
 import Image from "next/image";
 
-export default function ProfileMenu() {
+function useProfileMenuLogic() {
   const { user } = useTripStore();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -21,23 +21,48 @@ export default function ProfileMenu() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  if (!user) return null;
-
-  // safely grab their google data
-  const avatarUrl = user.user_metadata?.avatar_url;
+  // safely grab their google data (only if user exists)
+  const avatarUrl = user?.user_metadata?.avatar_url;
   const fullName =
-    user.user_metadata?.full_name || user.email?.split("@")[0] || "User";
+    user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
   const initial = fullName.charAt(0).toUpperCase();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    // our AuthProvider wrapper will instantly notice this and kick them to /login!
   };
+
+  const toggleMenu = () => setIsOpen(!isOpen);
+
+  return {
+    user,
+    isOpen,
+    menuRef,
+    avatarUrl,
+    fullName,
+    initial,
+    toggleMenu,
+    handleSignOut,
+  };
+}
+
+export default function ProfileMenu() {
+  const {
+    user,
+    isOpen,
+    menuRef,
+    avatarUrl,
+    fullName,
+    initial,
+    toggleMenu,
+    handleSignOut,
+  } = useProfileMenuLogic();
+
+  if (!user) return null;
 
   return (
     <div className="relative z-50" ref={menuRef}>
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={toggleMenu}
         className="w-11 h-11 rounded-full bg-stone-50 border-2 border-stone-100 flex items-center justify-center overflow-hidden hover:border-emerald-200 hover:shadow-md active:scale-95 transition-all shadow-sm group"
       >
         {avatarUrl ? (

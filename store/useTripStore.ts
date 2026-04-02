@@ -3,40 +3,6 @@ import { supabase } from "@/lib/supabase";
 import { Trip, Expense, Member, ExpenseItem } from "@/lib/types";
 import { User } from "@supabase/supabase-js";
 
-interface TripStore {
-  user: User | null;
-  setUser: (user: User | null) => void;
-  trips: Trip[];
-  isLoading: boolean;
-  fetchTrips: () => Promise<void>;
-  fetchTrip: (tripId: string) => Promise<void>;
-  addTrip: (trip: Trip) => Promise<void>;
-  renameTrip: (tripId: string, newName: string) => Promise<void>;
-  updateTripStatus: (tripId: string, status: string) => Promise<void>;
-  deleteTrip: (tripId: string) => Promise<void>;
-  addMember: (tripId: string, member: Member) => Promise<void>;
-  updateMember: (tripId: string, memberId: string, newName: string) => Promise<void>;
-  deleteMember: (tripId: string, memberId: string) => Promise<void>;
-  addExpense: (tripId: string, expense: Expense) => Promise<void>;
-  updateExpense: (
-    tripId: string,
-    expenseId: string,
-    expense: Expense,
-  ) => Promise<void>;
-  deleteExpense: (tripId: string, expenseId: string) => Promise<void>;
-  toggleExpenseSettled: (
-    tripId: string,
-    expenseId: string,
-    memberId: string,
-  ) => Promise<void>;
-  subscribeToTrip: (tripId: string) => () => void;
-  isSyncing: boolean;
-  toggleCollaborative: (
-    tripId: string,
-    isCollaborative: boolean,
-  ) => Promise<void>;
-}
-
 interface SupabaseExpenseRow {
   id: string;
   title: string;
@@ -80,13 +46,39 @@ const mapExpense = (exp: SupabaseExpenseRow): Expense => ({
   category: exp.category || "other",
 });
 
-export const useTripStore = create<TripStore>((set, get) => ({
-  user: null,
-  setUser: (user) => set({ user }),
+interface TripState {
+  user: User | null;
+  trips: Trip[];
+  isLoading: boolean;
+  isSyncing: boolean;
+}
 
+interface TripActions {
+  setUser: (user: User | null) => void;
+  fetchTrips: () => Promise<void>;
+  fetchTrip: (tripId: string) => Promise<void>;
+  addTrip: (trip: Trip) => Promise<void>;
+  renameTrip: (tripId: string, newName: string) => Promise<void>;
+  updateTripStatus: (tripId: string, status: string) => Promise<void>;
+  deleteTrip: (tripId: string) => Promise<void>;
+  addMember: (tripId: string, member: Member) => Promise<void>;
+  updateMember: (tripId: string, memberId: string, newName: string) => Promise<void>;
+  deleteMember: (tripId: string, memberId: string) => Promise<void>;
+  addExpense: (tripId: string, expense: Expense) => Promise<void>;
+  updateExpense: (tripId: string, expenseId: string, expense: Expense) => Promise<void>;
+  deleteExpense: (tripId: string, expenseId: string) => Promise<void>;
+  toggleExpenseSettled: (tripId: string, expenseId: string, memberId: string) => Promise<void>;
+  subscribeToTrip: (tripId: string) => () => void;
+  toggleCollaborative: (tripId: string, isCollaborative: boolean) => Promise<void>;
+}
+
+export const useTripStore = create<TripState & TripActions>((set, get) => ({
+  user: null,
   trips: [],
   isLoading: false,
   isSyncing: false,
+
+  setUser: (user) => set({ user }),
 
   fetchTrips: async () => {
     const currentUser = get().user;
@@ -98,6 +90,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
       .from("trips")
       .select("*")
       .eq("owner_id", currentUser.id);
+      
     const { data: linkedData } = await supabase
       .from("user_trips")
       .select("trips(*)")
@@ -173,7 +166,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
       updatedAt: tripRes.data.updated_at || tripRes.data.created_at,
       owner_id: tripRes.data.owner_id,
       owner_name: tripRes.data.owner_name,
-      status: tripRes.data.status || "ongoing", // <-- NEW
+      status: tripRes.data.status || "ongoing",
       members: membersRes.data || [],
       expenses: (expensesRes.data || []).map(mapExpense),
       is_collaborative: tripRes.data.is_collaborative || false,

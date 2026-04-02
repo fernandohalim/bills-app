@@ -2,82 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import packageJson from "../../package.json";
-
-const releases = [
-  {
-    version: "1.2.2",
-    date: "apr 2, 2026",
-    title: "small changes 😊",
-    badge: "patch",
-    badgeColor: "bg-teal-100 text-teal-700 border-teal-200",
-    features: ["fix info icon size inconsistency."],
-  },
-  {
-    version: "1.2.1",
-    date: "apr 2, 2026",
-    title: "crew management & prompt fix 👥",
-    badge: "patch",
-    badgeColor: "bg-sky-100 text-sky-700 border-sky-200",
-    features: [
-      "added rename members feature.",
-      "refine the member management into a dedicated popup modal.",
-      "fix the receipt scanner prompt to strictly output exact category matches.",
-    ],
-  },
-  {
-    version: "1.2",
-    date: "mar 31, 2026",
-    title: "math & polish 💅",
-    badge: "feature",
-    badgeColor: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200",
-    features: [
-      "added a dedicated in-app changelog page.",
-      "added transparent breakdowns for custom adjustments in the detailed ledger.",
-      "refine the about screen with new social buttons.",
-      "fixed a 'phantom tax' math bug for weighted item splits.",
-      "fixed some price ui alignment across the board to snap cleanly to the right edge.",
-    ],
-  },
-  {
-    version: "1.1",
-    date: "mar 31, 2026",
-    title: "receipts & ledgers ✨",
-    badge: "feature",
-    badgeColor: "bg-violet-100 text-violet-700 border-violet-200",
-    features: [
-      "added new receipt scanning logic to handle specific item discounts.",
-      "added logic to isolate individual item discounts from global tax and discount math.",
-      "added individual item prices directly inside the detailed ledger section.",
-      "added transparent item breakdowns associated with each member in the expense list.",
-    ],
-  },
-  {
-    version: "1.0.1",
-    date: "mar 31, 2026",
-    title: "bug fixing 🐛",
-    badge: "patch",
-    badgeColor: "bg-amber-100 text-amber-700 border-amber-200",
-    features: [
-      "added a shiny new about screen with creator social links.",
-      "fixed a buggy bouncing arrow on the home screen empty state.",
-      "fixed an issue where the about screen wouldn't show when a trip was empty.",
-    ],
-  },
-  {
-    version: "1.0",
-    date: "mar 31, 2026",
-    title: "the beginning 🐣",
-    badge: "launch",
-    badgeColor: "bg-emerald-100 text-emerald-700 border-emerald-200",
-    features: [
-      "launched 'nest.' into the wild!",
-      "receipt scanning with gemini!",
-      "exact splitting, equal splitting, and custom adjustments.",
-      "smart debt optimization (who pays who).",
-      "beautiful, transparent ledger breakdowns.",
-    ],
-  },
-];
+import { releases } from "@/lib/changelog";
 
 export default function Changelog() {
   const router = useRouter();
@@ -115,61 +40,118 @@ export default function Changelog() {
           </div>
         </div>
 
-        {/* the timeline */}
-        {/* 🔥 removed the md:before classes so the line stays on the left everywhere */}
-        <div className="space-y-8 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-1 before:bg-linear-to-b before:from-emerald-200 before:to-stone-100 before:rounded-full">
-          {releases.map((release, index) => (
-            <div
-              key={release.version}
-              // 🔥 removed alternating zigzag md: classes
-              className="relative flex items-center justify-between group is-active animate-in slide-in-from-bottom-4 fade-in duration-500"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              {/* timeline node */}
-              {/* 🔥 removed md: transform classes */}
-              <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-[#fdfbf7] bg-emerald-400 text-white shadow-sm shrink-0 relative z-10 group-hover:scale-110 transition-transform">
-                <span className="text-sm font-black text-white">
-                  v{release.version.split(".")[0]}
-                </span>
-              </div>
+        {/* the weighted timeline wrapper */}
+        <div className="space-y-5 relative before:absolute before:inset-0 before:ml-6 before:-translate-x-1/2 before:h-full before:w-1 before:bg-linear-to-b before:from-emerald-300 before:via-stone-200 before:to-stone-100 before:rounded-full">
+          {releases.map((release, index) => {
+            // dynamic weight logic
+            const parts = release.version.split(".");
+            let weight = 3;
+            if (parts.length === 2) {
+              weight = parts[1] === "0" ? 1 : 2;
+            }
 
-              {/* content card */}
-              {/* 🔥 removed md:w-[50%] classes so it always takes the remaining width */}
-              <div className="w-[calc(100%-3rem)] p-5 rounded-3xl bg-white border-2 border-stone-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all group-hover:-translate-y-1">
-                <div className="flex items-center justify-between mb-3">
-                  {/* 🔥 grouped badge and full version together */}
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border ${release.badgeColor}`}
-                    >
-                      v{release.version} - {release.badge}
-                    </span>
-                  </div>
-                  <time className="text-[10px] font-bold text-stone-400 uppercase tracking-wider shrink-0">
-                    {release.date}
-                  </time>
+            // render different nodes based on weight
+            let Node = null;
+            if (weight === 1) {
+              Node = (
+                <div className="flex items-center justify-center w-12 h-12 rounded-full border-4 border-[#fdfbf7] bg-stone-900 shadow-xl relative z-10 group-hover:scale-110 group-hover:-rotate-12 transition-transform">
+                  <span className="text-xl">🚀</span>
                 </div>
+              );
+            } else if (weight === 2) {
+              Node = (
+                <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-[#fdfbf7] bg-emerald-400 text-white shadow-sm relative z-10 group-hover:scale-110 transition-transform mt-0.5">
+                  <span className="text-[10px] font-black">
+                    v{release.version}
+                  </span>
+                </div>
+              );
+            } else {
+              Node = (
+                <div className="flex items-center justify-center w-5 h-5 rounded-full border-[3px] border-[#fdfbf7] bg-stone-300 relative z-10 group-hover:bg-sky-400 group-hover:scale-125 transition-all mt-2.5"></div>
+              );
+            }
 
-                <h3 className="text-lg font-extrabold text-stone-800 mb-3">
-                  {release.title}
-                </h3>
+            return (
+              <div
+                key={release.version}
+                className={`relative flex gap-3 sm:gap-4 group is-active animate-in slide-in-from-bottom-4 fade-in duration-500 ${
+                  weight === 1 ? "mt-12" : ""
+                }`}
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                {/* node column */}
+                <div className="w-12 flex justify-center shrink-0">{Node}</div>
 
-                <ul className="space-y-2">
-                  {release.features.map((feature, idx) => (
-                    <li
-                      key={idx}
-                      className="text-sm font-bold text-stone-500 flex items-start gap-2 leading-tight"
-                    >
-                      <span className="text-emerald-400 mt-0.5 shrink-0">
-                        ↳
+                {/* content card */}
+                <div
+                  className={`flex-1 transition-all group-hover:-translate-y-1 ${
+                    weight === 1
+                      ? "p-6 rounded-4xl bg-white border-2 border-stone-300 shadow-lg hover:shadow-xl hover:border-emerald-500" // anchor Card
+                      : weight === 2
+                        ? "p-5 rounded-3xl bg-white border-2 border-stone-100 shadow-sm hover:shadow-md hover:border-emerald-200" // feature Card
+                        : "p-4 rounded-2xl bg-white/50 border border-stone-100/80 shadow-sm hover:bg-white hover:border-stone-200" // patch Card
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <span
+                        className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border ${release.badgeColor}`}
+                      >
+                        v{release.version} - {release.badge}
                       </span>
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
+                    </div>
+                    <time className="text-[10px] font-bold text-stone-400 uppercase tracking-wider shrink-0">
+                      {release.date}
+                    </time>
+                  </div>
+
+                  {/* title scales based on weight */}
+                  <h3
+                    className={`font-extrabold text-stone-800 mb-3 ${
+                      weight === 1
+                        ? "text-2xl"
+                        : weight === 2
+                          ? "text-lg"
+                          : "text-base"
+                    }`}
+                  >
+                    {release.title}
+                  </h3>
+
+                  <ul className="space-y-2">
+                    {release.features.map((feature, idx) => (
+                      <li
+                        key={idx}
+                        className={`text-sm font-bold flex items-start gap-2 leading-tight ${
+                          weight === 3 ? "text-stone-400" : "text-stone-500"
+                        }`}
+                      >
+                        <span
+                          className={`mt-0.5 shrink-0 transition-colors ${
+                            weight === 1
+                              ? "text-stone-800 group-hover:text-emerald-500"
+                              : weight === 2
+                                ? "text-emerald-400"
+                                : "text-stone-300 group-hover:text-sky-400"
+                          }`}
+                        >
+                          ↳
+                        </span>
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
+        </div>
+
+        <div className="mt-16 text-center">
+          <p className="text-xs font-black text-stone-300 uppercase tracking-widest animate-pulse">
+            more magic coming soon ✨
+          </p>
         </div>
       </div>
     </main>

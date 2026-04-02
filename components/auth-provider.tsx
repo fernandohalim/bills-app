@@ -12,48 +12,49 @@ export default function AuthProvider({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { setUser } = useTripStore();
+  const { user, setUser } = useTripStore();
   const [isInitializing, setIsInitializing] = useState(true);
 
+  // hook 1: talks to supabase and keeps our global store updated.
   useEffect(() => {
-    // 1. check for an active session when the app first loads
-    const checkSession = async () => {
+    const initSession = async () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
       setUser(session?.user || null);
-
-      const isPublicRoute = pathname.startsWith("/trip/");
-
-      // if no user and they aren't already on the login page, kick them out!
-      if (!session?.user && pathname !== "/login" && !isPublicRoute) {
-        router.push("/login");
-      }
       setIsInitializing(false);
     };
 
-    checkSession();
+    initSession();
 
-    // 2. silently listen for any login/logout events in the background
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
-
-      const isPublicRoute = pathname.startsWith("/trip/");
-
-      if (!session?.user && pathname !== "/login" && !isPublicRoute) {
-        router.push("/login");
-      } else if (session?.user && pathname === "/login") {
-        router.push("/");
-      }
     });
 
     return () => subscription.unsubscribe();
-  }, [pathname, router, setUser]);
+  }, [setUser]);
 
-  // show a completely blank screen for a split second while we check their cookies
-  // so we don't accidentally flash the dashboard to a logged-out user
+  // hook 2: watches where the user is going and acts as a bouncer.
+  useEffect(() => {
+    if (isInitializing) return;
+
+    // define our safe zones
+    const isPublicRoute =
+      pathname.startsWith("/trip/") || pathname === "/changelog";
+    const isAuthRoute = pathname === "/login" || pathname === "/auth/callback";
+
+    if (!user && !isAuthRoute && !isPublicRoute) {
+      // not logged in
+      router.replace("/login");
+    } else if (user && isAuthRoute) {
+      // logged in but trying to view the login page
+      router.replace("/");
+    }
+  }, [user, pathname, isInitializing, router]);
+
+  // prevent accidentally flash the dashboard to a logged-out user
   if (isInitializing) {
     return (
       <div className="min-h-screen bg-[#fdfbf7] flex flex-col items-center justify-center p-6 selection:bg-emerald-200 selection:text-emerald-900">

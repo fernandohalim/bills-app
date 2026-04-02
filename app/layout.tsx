@@ -11,6 +11,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: "cover",
 };
 
 export const metadata: Metadata = {
@@ -59,7 +60,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-[#fdfbf7] text-stone-800">
         <AuthProvider>
           {children}
-          <PlayfulAlert /> {/* <-- mount it here right under children */}
+          <PlayfulAlert />
         </AuthProvider>
         <script
           dangerouslySetInnerHTML={{

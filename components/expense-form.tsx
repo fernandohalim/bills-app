@@ -6,13 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import { useAlertStore } from "@/store/useAlertStore";
 import CustomSelect from "./custom-select";
 import CustomDatePicker from "./custom-date-picker";
-
-interface ExpenseFormProps {
-  members: Member[];
-  initialExpense?: Expense;
-  onSave: (expense: Expense) => void;
-  onCancel: () => void;
-}
+import { ExpenseFormProps } from "@/lib/types";
 
 const CATEGORIES = [
   { value: "food & bev", label: "🍔 food & bev" },
@@ -34,21 +28,22 @@ const getLocalISOString = () => {
   return `${y}-${m}-${d}T${h}:${min}:00`;
 };
 
-export default function ExpenseForm({
-  members,
-  initialExpense,
-  onSave,
-  onCancel,
-}: ExpenseFormProps) {
-  const formatNumber = (value: string | number) => {
-    if (!value) return "";
-    const numericOnly = value.toString().replace(/\D/g, "");
-    if (!numericOnly) return "";
-    return parseInt(numericOnly, 10).toLocaleString("en-US");
-  };
+const formatNumber = (value: string | number) => {
+  if (!value) return "";
+  const numericOnly = value.toString().replace(/\D/g, "");
+  if (!numericOnly) return "";
+  return parseInt(numericOnly, 10).toLocaleString("en-US");
+};
 
-  const getRawNumber = (formattedValue: string) =>
-    parseInt(formattedValue.replace(/,/g, ""), 10) || 0;
+const getRawNumber = (formattedValue: string) =>
+  parseInt(formattedValue.replace(/,/g, ""), 10) || 0;
+
+function useExpenseFormLogic(
+  members: Member[],
+  initialExpense: Expense | undefined,
+  onSave: (expense: Expense) => void,
+) {
+  const showAlert = useAlertStore((state) => state.showAlert);
 
   const [title, setTitle] = useState(initialExpense?.title || "");
   const [amount, setAmount] = useState(
@@ -103,6 +98,7 @@ export default function ExpenseForm({
         )
       : {},
   );
+
   const [items, setItems] = useState<ExpenseItem[]>(
     initialExpense?.items || [
       { id: uuidv4(), name: "", price: 0, assignedTo: [] },
@@ -110,6 +106,7 @@ export default function ExpenseForm({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Math & Handlers
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setAmount(formatNumber(e.target.value));
   const handlePayerChange = (id: string, val: string) =>
@@ -145,12 +142,8 @@ export default function ExpenseForm({
   const increaseItemMemberWeight = (itemId: string, memberId: string) => {
     setItems(
       items.map((item) => {
-        if (item.id === itemId) {
-          return {
-            ...item,
-            assignedTo: [...item.assignedTo, memberId],
-          };
-        }
+        if (item.id === itemId)
+          return { ...item, assignedTo: [...item.assignedTo, memberId] };
         return item;
       }),
     );
@@ -160,23 +153,17 @@ export default function ExpenseForm({
     setItems(
       items.map((item) => {
         if (item.id === itemId) {
-          // find the first occurrence of their ID and slice it out
           const index = item.assignedTo.indexOf(memberId);
           if (index > -1) {
             const newAssignedTo = [...item.assignedTo];
             newAssignedTo.splice(index, 1);
-            return {
-              ...item,
-              assignedTo: newAssignedTo,
-            };
+            return { ...item, assignedTo: newAssignedTo };
           }
         }
         return item;
       }),
     );
   };
-
-  const showAlert = useAlertStore((state) => state.showAlert);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -325,19 +312,94 @@ export default function ExpenseForm({
     });
   };
 
-  const currentTotal = getRawNumber(amount);
-  const itemsSum = items.reduce((acc, item) => acc + item.price, 0);
-  const difference = currentTotal - itemsSum;
-
-  const newLocal =
-    "flex-[2] py-4.5 bg-stone-900 text-white rounded-2xl text-base font-black hover:bg-emerald-600 transition-all shadow-xl shadow-stone-900/20 hover:shadow-emerald-600/30 active:scale-95 disabled:bg-stone-300 disabled:shadow-none flex justify-center items-center";
-
   const totalAmountNum = parseFloat(amount.toString().replace(/,/g, "")) || 0;
   const currentPaidSum = Object.values(payers).reduce(
     (sum, val) => sum + (parseFloat(val.toString().replace(/,/g, "")) || 0),
     0,
   );
   const mathDiff = totalAmountNum - currentPaidSum;
+  const itemsSum = items.reduce((acc, item) => acc + item.price, 0);
+  const difference = totalAmountNum - itemsSum;
+
+  return {
+    title,
+    setTitle,
+    amount,
+    handleAmountChange,
+    category,
+    setCategory,
+    expenseDate,
+    setExpenseDate,
+    isMultiplePayers,
+    setIsMultiplePayers,
+    payerId,
+    setPayerId,
+    payers,
+    handlePayerChange,
+    splitType,
+    setSplitType,
+    involvedIds,
+    toggleInvolved,
+    adjustments,
+    handleAdjustmentChange,
+    items,
+    handleAddItem,
+    handleRemoveItem,
+    handleItemChange,
+    increaseItemMemberWeight,
+    decreaseItemMemberWeight,
+    isSubmitting,
+    handleSubmit,
+    totalAmountNum,
+    mathDiff,
+    itemsSum,
+    difference,
+  };
+}
+
+export default function ExpenseForm({
+  members,
+  initialExpense,
+  onSave,
+  onCancel,
+}: ExpenseFormProps) {
+  const {
+    title,
+    setTitle,
+    amount,
+    handleAmountChange,
+    category,
+    setCategory,
+    expenseDate,
+    setExpenseDate,
+    isMultiplePayers,
+    setIsMultiplePayers,
+    payerId,
+    setPayerId,
+    payers,
+    handlePayerChange,
+    splitType,
+    setSplitType,
+    involvedIds,
+    toggleInvolved,
+    adjustments,
+    handleAdjustmentChange,
+    items,
+    handleAddItem,
+    handleRemoveItem,
+    handleItemChange,
+    increaseItemMemberWeight,
+    decreaseItemMemberWeight,
+    isSubmitting,
+    handleSubmit,
+    totalAmountNum,
+    mathDiff,
+    itemsSum,
+    difference,
+  } = useExpenseFormLogic(members, initialExpense, onSave);
+
+  const newLocal =
+    "flex-[2] py-4.5 bg-stone-900 text-white rounded-2xl text-base font-black hover:bg-emerald-600 transition-all shadow-xl shadow-stone-900/20 hover:shadow-emerald-600/30 active:scale-95 disabled:bg-stone-300 disabled:shadow-none flex justify-center items-center";
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-8">
@@ -433,7 +495,7 @@ export default function ExpenseForm({
               </div>
             ))}
 
-            {/* 3. Multiple Payers Math Helper */}
+            {/* Multiple Payers Math Helper */}
             <div className="mt-4 pt-4 border-t-2 border-dashed border-stone-100">
               {totalAmountNum === 0 ? (
                 <p className="text-[11px] font-bold text-stone-400 text-center py-2">
@@ -480,11 +542,9 @@ export default function ExpenseForm({
           </div>
 
           <div className="bg-stone-100 p-1.5 rounded-3xl flex gap-1 relative overflow-hidden">
-            {/* Animated slider background (pseudo element approach via tailwind) */}
             <div
               className={`absolute top-1.5 bottom-1.5 w-[32%] bg-white rounded-2xl shadow-sm transition-all duration-300 ease-out ${splitType === "equal" ? "left-[1.5%]" : splitType === "exact" ? "left-[34%]" : "left-[66.5%]"}`}
             ></div>
-
             <button
               type="button"
               onClick={() => setSplitType("equal")}
@@ -508,7 +568,6 @@ export default function ExpenseForm({
             </button>
           </div>
 
-          {/* 1. Dynamic Split Explainer */}
           <div className="px-2 min-h-5">
             <p
               key={splitType}
@@ -533,22 +592,12 @@ export default function ExpenseForm({
               return (
                 <div
                   key={m.id}
-                  className={`flex items-center justify-between p-3.5 rounded-2xl border-2 transition-all cursor-pointer ${
-                    isTicked
-                      ? "bg-white border-emerald-400 shadow-sm"
-                      : hasAdjustment
-                        ? "bg-white border-stone-300 shadow-sm" // keeps it solid if they have an active adjustment
-                        : "bg-stone-50 border-stone-100 opacity-60 hover:opacity-100"
-                  }`}
+                  className={`flex items-center justify-between p-3.5 rounded-2xl border-2 transition-all cursor-pointer ${isTicked ? "bg-white border-emerald-400 shadow-sm" : hasAdjustment ? "bg-white border-stone-300 shadow-sm" : "bg-stone-50 border-stone-100 opacity-60 hover:opacity-100"}`}
                   onClick={() => toggleInvolved(m.id)}
                 >
                   <div className="flex items-center gap-4">
                     <div
-                      className={`w-6 h-6 shrink-0 rounded-full border-2 flex items-center justify-center transition-all ${
-                        isTicked
-                          ? "bg-emerald-500 border-emerald-500 text-white scale-110"
-                          : "border-stone-300 bg-white"
-                      }`}
+                      className={`w-6 h-6 shrink-0 rounded-full border-2 flex items-center justify-center transition-all ${isTicked ? "bg-emerald-500 border-emerald-500 text-white scale-110" : "border-stone-300 bg-white"}`}
                     >
                       {isTicked && (
                         <svg
@@ -567,17 +616,12 @@ export default function ExpenseForm({
                       )}
                     </div>
                     <span
-                      className={`text-sm font-bold ${
-                        isTicked || hasAdjustment
-                          ? "text-stone-800"
-                          : "text-stone-500"
-                      }`}
+                      className={`text-sm font-bold ${isTicked || hasAdjustment ? "text-stone-800" : "text-stone-500"}`}
                     >
                       {m.name}
                     </span>
                   </div>
 
-                  {/* removed the strict involvesId check here so anyone can get an adjustment input */}
                   {splitType === "adjustment" && (
                     <input
                       type="text"
@@ -588,11 +632,7 @@ export default function ExpenseForm({
                         handleAdjustmentChange(m.id, e.target.value)
                       }
                       onClick={(e) => e.stopPropagation()}
-                      className={`w-20 text-right bg-transparent border-b-2 text-sm font-black focus:outline-none py-1 placeholder:font-bold transition-colors ${
-                        isTicked
-                          ? "border-emerald-100 text-emerald-600 focus:border-emerald-500 placeholder:text-emerald-200"
-                          : "border-stone-200 text-stone-600 focus:border-stone-400 placeholder:text-stone-300"
-                      }`}
+                      className={`w-20 text-right bg-transparent border-b-2 text-sm font-black focus:outline-none py-1 placeholder:font-bold transition-colors ${isTicked ? "border-emerald-100 text-emerald-600 focus:border-emerald-500 placeholder:text-emerald-200" : "border-stone-200 text-stone-600 focus:border-stone-400 placeholder:text-stone-300"}`}
                     />
                   )}
                 </div>
@@ -603,7 +643,6 @@ export default function ExpenseForm({
 
         {splitType === "exact" && (
           <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-            {/* 2. Secret Multiplier Hint */}
             <div className="flex items-center gap-3 p-3 bg-emerald-50/50 border border-emerald-100 rounded-2xl animate-in fade-in zoom-in-95 duration-500 delay-150">
               <span className="text-xl">✨</span>
               <p className="text-[11px] font-bold text-emerald-700 leading-snug">
@@ -622,11 +661,7 @@ export default function ExpenseForm({
               return (
                 <div
                   key={item.id}
-                  className={`border-2 rounded-3xl bg-white shadow-sm flex flex-col group overflow-hidden transition-colors duration-300 ${
-                    isOrphaned
-                      ? "border-rose-100 shadow-rose-100"
-                      : "border-stone-100"
-                  }`}
+                  className={`border-2 rounded-3xl bg-white shadow-sm flex flex-col group overflow-hidden transition-colors duration-300 ${isOrphaned ? "border-rose-100 shadow-rose-100" : "border-stone-100"}`}
                 >
                   {/* Inputs Row */}
                   <div
@@ -689,9 +724,7 @@ export default function ExpenseForm({
                                   </span>
                                 )}
                               </button>
-
                               <div className="w-px bg-stone-600 my-1"></div>
-
                               <button
                                 type="button"
                                 onClick={() =>
@@ -731,8 +764,6 @@ export default function ExpenseForm({
                         );
                       })}
                     </div>
-
-                    {/* tiny subtle warning text if orphaned */}
                     {isOrphaned && (
                       <span className="text-[10px] font-bold text-rose-500 mt-2 ml-1 animate-in fade-in duration-300">
                         ↑ tap a name to assign this item!

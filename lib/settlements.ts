@@ -1,10 +1,4 @@
-import { Trip, Member } from './types';
-
-export interface Transaction {
-  from: Member;
-  to: Member;
-  amount: number;
-}
+import { Trip, Transaction } from './types';
 
 export function calculateSettlements(trip: Trip): Transaction[] {
   if (!trip || trip.members.length === 0 || trip.expenses.length === 0) return [];
@@ -13,28 +7,28 @@ export function calculateSettlements(trip: Trip): Transaction[] {
   trip.members.forEach(m => { balances[m.id] = 0; });
 
   trip.expenses.forEach(exp => {
-    // 1. add what people paid
+    // add what people paid
     if (exp.paidBy) {
       Object.entries(exp.paidBy).forEach(([memberId, amount]) => {
         if (balances[memberId] !== undefined) balances[memberId] += amount;
       });
     }
 
-    // 2. subtract what people owe
+    // subtract what people owe
     if (exp.owedBy) {
       Object.entries(exp.owedBy).forEach(([memberId, amount]) => {
         if (balances[memberId] !== undefined) balances[memberId] -= amount;
       });
     }
 
-    // 3. handle direct in-expense settlements (e.g., ronal paid kitong 1m directly)
+    // handle direct in-expense settlements (e.g., a paid b 1m directly)
     if (exp.settledShares) {
       const payerId = Object.keys(exp.paidBy)[0]; // the person who originally paid the bill
       Object.entries(exp.settledShares).forEach(([memberId, isSettled]) => {
         if (isSettled && exp.owedBy[memberId] && payerId) {
            const amount = exp.owedBy[memberId];
-           if (balances[memberId] !== undefined) balances[memberId] += amount; // ronal gets his balance back up
-           if (balances[payerId] !== undefined) balances[payerId] -= amount;   // kitong's balance drops because he got the cash
+           if (balances[memberId] !== undefined) balances[memberId] += amount; // a gets his balance back up
+           if (balances[payerId] !== undefined) balances[payerId] -= amount;   // b's balance drops because he got the cash
         }
       });
     }

@@ -41,3 +41,59 @@ export interface Trip {
   status?: string;
   is_collaborative?: boolean;
 }
+
+export interface Release {
+  version: string;
+  date: string;
+  title: string;
+  badge: string;
+  badgeColor: string;
+  features: string[];
+}
+
+export interface Transaction {
+  from: Member;
+  to: Member;
+  amount: number;
+}
+
+export interface AboutModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export interface CameraScannerProps {
+  onCapture: (file: File) => void;
+  onClose: () => void;
+  onUploadFallback: () => void;
+}
+
+export interface CreateTripModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export interface CustomDatePickerProps {
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+}
+
+export interface Option {
+  value: string;
+  label: string;
+}
+
+export interface CustomSelectProps {
+  value: string;
+  onChange: (value: string) => void;
+  options: Option[];
+  className?: string;
+}
+
+export interface ExpenseFormProps {
+  members: Member[];
+  initialExpense?: Expense;
+  onSave: (expense: Expense) => void;
+  onCancel: () => void;
+}

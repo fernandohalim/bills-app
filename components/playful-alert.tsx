@@ -2,7 +2,7 @@
 
 import { useAlertStore } from "@/store/useAlertStore";
 
-export default function PlayfulAlert() {
+function usePlayfulAlertLogic() {
   const {
     isOpen,
     type,
@@ -13,6 +13,52 @@ export default function PlayfulAlert() {
     close,
     confirm,
   } = useAlertStore();
+
+  // logic to determine which emoji to show
+  const getEmoji = () => {
+    if (type === "confirm" && title.includes("nuke")) return "🧨";
+    if (type === "confirm") return "🤔";
+    if (title.includes("✨")) return "✨";
+    return "🛑";
+  };
+
+  // logic for the primary button color
+  const getConfirmButtonStyles = () => {
+    const isDestructive = title.includes("nuke") || title.includes("delete");
+
+    if (type === "confirm" && isDestructive) {
+      return "bg-rose-500 hover:bg-rose-600 shadow-rose-500/20";
+    }
+    return "bg-stone-900 hover:bg-emerald-500 shadow-stone-900/20 hover:shadow-emerald-500/30";
+  };
+
+  return {
+    isOpen,
+    type,
+    title,
+    message,
+    confirmText,
+    cancelText,
+    close,
+    confirm,
+    emoji: getEmoji(),
+    confirmButtonStyles: getConfirmButtonStyles(),
+  };
+}
+
+export default function PlayfulAlert() {
+  const {
+    isOpen,
+    type,
+    title,
+    message,
+    confirmText,
+    cancelText,
+    close,
+    confirm,
+    emoji,
+    confirmButtonStyles,
+  } = usePlayfulAlertLogic();
 
   if (!isOpen) return null;
 
@@ -28,13 +74,7 @@ export default function PlayfulAlert() {
       <div className="bg-[#fdfbf7] rounded-[2.5rem] p-6 sm:p-8 w-full max-w-sm shadow-2xl relative z-10 animate-in zoom-in-95 slide-in-from-bottom-8 duration-300 flex flex-col items-center text-center border-4 border-white mt-8">
         {/* floating emoji badge */}
         <div className="absolute -top-10 w-20 h-20 bg-white rounded-full flex items-center justify-center text-4xl border-4 border-[#fdfbf7] shadow-sm transform hover:scale-110 transition-transform duration-300">
-          {type === "confirm" && title.includes("nuke")
-            ? "🧨"
-            : type === "confirm"
-              ? "🤔"
-              : title.includes("✨")
-                ? "✨"
-                : "🛑"}
+          {emoji}
         </div>
 
         <h3 className="text-2xl font-black text-stone-800 mb-3 mt-8">
@@ -53,15 +93,10 @@ export default function PlayfulAlert() {
               {cancelText}
             </button>
           )}
+          {/* button styles applied dynamically from the hook */}
           <button
             onClick={confirm}
-            className={`flex-1 py-4 rounded-2xl text-sm font-black text-white transition-all shadow-xl active:scale-95 ${
-              type === "confirm"
-                ? title.includes("nuke") || title.includes("delete")
-                  ? "bg-rose-500 hover:bg-rose-600 shadow-rose-500/20"
-                  : "bg-stone-900 hover:bg-emerald-500 shadow-stone-900/20 hover:shadow-emerald-500/30"
-                : "bg-stone-900 hover:bg-emerald-500 shadow-stone-900/20 hover:shadow-emerald-500/30"
-            }`}
+            className={`flex-1 py-4 rounded-2xl text-sm font-black text-white transition-all shadow-xl active:scale-95 ${confirmButtonStyles}`}
           >
             {confirmText}
           </button>

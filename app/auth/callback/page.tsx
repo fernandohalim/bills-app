@@ -8,19 +8,17 @@ export default function AuthCallback() {
   const router = useRouter();
 
   useEffect(() => {
-    // supabase automatically processes the secure url codes in the background.
-    // we just wait for the 'signed_in' event and route them to the dashboard!
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (event === "SIGNED_IN" || session) {
-          router.push("/");
+          router.replace("/");
         }
       },
     );
 
     // fallback just in case the event fired faster than the page rendered
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) router.push("/");
+      if (data.session) router.replace("/");
     });
 
     return () => authListener.subscription.unsubscribe();

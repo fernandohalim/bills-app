@@ -1,30 +1,19 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { Option, CustomSelectProps } from "@/lib/types";
 
-interface Option {
-  value: string;
-  label: string;
-}
-
-interface CustomSelectProps {
-  value: string;
-  onChange: (value: string) => void;
-  options: Option[];
-  className?: string;
-}
-
-export default function CustomSelect({
-  value,
-  onChange,
-  options,
-  className = "",
-}: CustomSelectProps) {
+function useCustomSelectLogic(
+  value: string,
+  options: Option[],
+  onChange: (value: string) => void,
+) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find((opt) => opt.value === value);
 
+  // handle closing when clicking outside the component
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -39,11 +28,37 @@ export default function CustomSelect({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const handleToggle = () => setIsOpen(!isOpen);
+
+  const handleSelect = (selectedValue: string) => {
+    onChange(selectedValue);
+    setIsOpen(false);
+  };
+
+  return {
+    isOpen,
+    dropdownRef,
+    selectedOption,
+    handleToggle,
+    handleSelect,
+  };
+}
+
+export default function CustomSelect({
+  value,
+  onChange,
+  options,
+  className = "",
+}: CustomSelectProps) {
+  const { isOpen, dropdownRef, selectedOption, handleToggle, handleSelect } =
+    useCustomSelectLogic(value, options, onChange);
+
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
+      {/* Dropdown Button */}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         className="w-full flex items-center justify-between bg-white border-2 border-stone-100 shadow-sm rounded-2xl px-4 py-3.5 text-sm font-bold text-stone-600 focus:outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition-all active:scale-[0.98]"
       >
         <span>{selectedOption?.label || "select..."}</span>
@@ -64,6 +79,7 @@ export default function CustomSelect({
         </svg>
       </button>
 
+      {/* Dropdown Menu List */}
       {isOpen && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-white border-2 border-stone-100 rounded-2xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="max-h-60 overflow-y-auto py-1">
@@ -71,10 +87,7 @@ export default function CustomSelect({
               <button
                 key={option.value}
                 type="button"
-                onClick={() => {
-                  onChange(option.value);
-                  setIsOpen(false);
-                }}
+                onClick={() => handleSelect(option.value)}
                 className={`w-full text-left px-4 py-3 text-sm font-bold transition-colors ${
                   value === option.value
                     ? "bg-emerald-50 text-emerald-700"

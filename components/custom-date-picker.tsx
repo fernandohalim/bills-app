@@ -1,12 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-
-interface CustomDatePickerProps {
-  value: string;
-  onChange: (value: string) => void;
-  className?: string;
-}
+import { CustomDatePickerProps } from "@/lib/types";
 
 const MONTHS = [
   "january",
@@ -35,19 +30,15 @@ const formatLocalISO = (date: Date) => {
   return `${y}-${m}-${d}T${h}:${min}:00`;
 };
 
-export default function CustomDatePicker({
-  value,
-  onChange,
-  className = "",
-}: CustomDatePickerProps) {
+function useDatePickerLogic(value: string, onChange: (value: string) => void) {
   const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const currentDate = value ? new Date(value) : new Date();
   const [viewDate, setViewDate] = useState(
     new Date(currentDate.getFullYear(), currentDate.getMonth(), 1),
   );
 
-  // custom 12hr state
   const [time12, setTime12] = useState(() => {
     let h = currentDate.getHours();
     const ampm = h >= 12 ? "PM" : "AM";
@@ -61,7 +52,6 @@ export default function CustomDatePicker({
 
   const [prevValue, setPrevValue] = useState(value);
 
-  // sync time if it changes from outside (like an ai scan)
   if (value !== prevValue) {
     setPrevValue(value);
     if (value) {
@@ -78,8 +68,6 @@ export default function CustomDatePicker({
       }
     }
   }
-
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -105,55 +93,6 @@ export default function CustomDatePicker({
     1,
   ).getDay();
 
-  const handlePrevMonth = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1));
-  };
-
-  const handleNextMonth = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1));
-  };
-
-  const handleSelectDate = (day: number) => {
-    const newDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
-    let hours12 = parseInt(time12.h) || 12;
-    if (hours12 === 12) hours12 = 0;
-    if (time12.ampm === "PM") hours12 += 12;
-
-    newDate.setHours(hours12, parseInt(time12.m) || 0, 0, 0);
-    // output perfectly formatted local time
-    onChange(formatLocalISO(newDate));
-  };
-
-  const handleTimeChange = (field: "h" | "m" | "ampm", val: string) => {
-    if (field !== "ampm") val = val.replace(/\D/g, ""); // strip letters
-    const newTime = { ...time12, [field]: val };
-    setTime12(newTime);
-
-    let hours12 = parseInt(newTime.h) || 12;
-    let mins = parseInt(newTime.m) || 0;
-    if (hours12 > 12) hours12 = 12;
-    if (mins > 59) mins = 59;
-
-    let hours24 = hours12;
-    if (hours24 === 12) hours24 = 0;
-    if (newTime.ampm === "PM") hours24 += 12;
-
-    const newDate = value ? new Date(value) : new Date();
-    newDate.setHours(hours24, mins, 0, 0);
-    onChange(formatLocalISO(newDate));
-  };
-
-  // cleanup weird inputs when clicking away
-  const handleBlur = (field: "h" | "m") => {
-    let val = parseInt(time12[field]) || (field === "h" ? 12 : 0);
-    if (field === "h" && val > 12) val = 12;
-    if (field === "h" && val === 0) val = 12;
-    if (field === "m" && val > 59) val = 59;
-    setTime12((prev) => ({ ...prev, [field]: String(val).padStart(2, "0") }));
-  };
-
   const formattedDisplay = currentDate.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -178,6 +117,95 @@ export default function CustomDatePicker({
       today.getDate() === day
     );
   };
+
+  const handlePrevMonth = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1));
+  };
+
+  const handleSelectDate = (day: number) => {
+    const newDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
+    let hours12 = parseInt(time12.h) || 12;
+    if (hours12 === 12) hours12 = 0;
+    if (time12.ampm === "PM") hours12 += 12;
+
+    newDate.setHours(hours12, parseInt(time12.m) || 0, 0, 0);
+    onChange(formatLocalISO(newDate));
+  };
+
+  const handleTimeChange = (field: "h" | "m" | "ampm", val: string) => {
+    if (field !== "ampm") val = val.replace(/\D/g, ""); // strip letters
+    const newTime = { ...time12, [field]: val };
+    setTime12(newTime);
+
+    let hours12 = parseInt(newTime.h) || 12;
+    let mins = parseInt(newTime.m) || 0;
+    if (hours12 > 12) hours12 = 12;
+    if (mins > 59) mins = 59;
+
+    let hours24 = hours12;
+    if (hours24 === 12) hours24 = 0;
+    if (newTime.ampm === "PM") hours24 += 12;
+
+    const newDate = value ? new Date(value) : new Date();
+    newDate.setHours(hours24, mins, 0, 0);
+    onChange(formatLocalISO(newDate));
+  };
+
+  const handleBlur = (field: "h" | "m") => {
+    let val = parseInt(time12[field]) || (field === "h" ? 12 : 0);
+    if (field === "h" && val > 12) val = 12;
+    if (field === "h" && val === 0) val = 12;
+    if (field === "m" && val > 59) val = 59;
+    setTime12((prev) => ({ ...prev, [field]: String(val).padStart(2, "0") }));
+  };
+
+  return {
+    isOpen,
+    setIsOpen,
+    dropdownRef,
+    viewDate,
+    time12,
+    daysInMonth,
+    firstDayOfMonth,
+    formattedDisplay,
+    isSelected,
+    isToday,
+    handlePrevMonth,
+    handleNextMonth,
+    handleSelectDate,
+    handleTimeChange,
+    handleBlur,
+  };
+}
+
+export default function CustomDatePicker({
+  value,
+  onChange,
+  className = "",
+}: CustomDatePickerProps) {
+  const {
+    isOpen,
+    setIsOpen,
+    dropdownRef,
+    viewDate,
+    time12,
+    daysInMonth,
+    firstDayOfMonth,
+    formattedDisplay,
+    isSelected,
+    isToday,
+    handlePrevMonth,
+    handleNextMonth,
+    handleSelectDate,
+    handleTimeChange,
+    handleBlur,
+  } = useDatePickerLogic(value, onChange);
 
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
@@ -275,13 +303,7 @@ export default function CustomDatePicker({
                   type="button"
                   onClick={() => handleSelectDate(day)}
                   className={`h-9 rounded-full text-xs font-bold transition-all flex items-center justify-center
-                    ${
-                      selected
-                        ? "bg-emerald-500 text-white shadow-md scale-105"
-                        : today
-                          ? "text-emerald-600 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100"
-                          : "text-stone-600 hover:bg-stone-100 hover:text-stone-900"
-                    }
+                    ${selected ? "bg-emerald-500 text-white shadow-md scale-105" : today ? "text-emerald-600 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900"}
                   `}
                 >
                   {day}
@@ -306,7 +328,6 @@ export default function CustomDatePicker({
                   d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-
               <div className="flex items-center gap-0.5">
                 <input
                   type="text"
@@ -326,7 +347,6 @@ export default function CustomDatePicker({
                   className="w-6 text-center bg-transparent text-sm font-black text-stone-700 focus:outline-none placeholder:text-stone-300"
                 />
               </div>
-
               <button
                 type="button"
                 onClick={() =>
@@ -337,7 +357,6 @@ export default function CustomDatePicker({
                 {time12.ampm}
               </button>
             </div>
-
             <button
               type="button"
               onClick={() => setIsOpen(false)}

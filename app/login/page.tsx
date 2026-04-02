@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useTripStore } from "@/store/useTripStore";
@@ -8,7 +8,6 @@ import { useTripStore } from "@/store/useTripStore";
 export default function Login() {
   const router = useRouter();
   const { user } = useTripStore();
-  const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -27,7 +26,7 @@ export default function Login() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-6 bg-[#fdfbf7] relative overflow-hidden selection:bg-emerald-200 selection:text-emerald-900">
-      {/* playful floating background elements */}
+      {/* floating background elements */}
       <div className="absolute top-[15%] left-[10%] text-5xl opacity-40 -rotate-12 animate-[bounce_8s_ease-in-out_infinite]">
         🍔
       </div>
@@ -41,7 +40,7 @@ export default function Login() {
         ☕
       </div>
 
-      {/* magical blob glow behind the card */}
+      {/* glow behind the card */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-400/20 rounded-full blur-[100px] z-0 pointer-events-none"></div>
 
       <div className="w-full max-w-sm bg-white p-10 rounded-[2.5rem] shadow-2xl shadow-emerald-900/5 border-2 border-stone-100 text-center relative z-10 animate-in zoom-in-95 duration-500">
@@ -60,13 +59,11 @@ export default function Login() {
 
         <button
           onClick={handleGoogleLogin}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
+          // deleted onMouseEnter/onMouseLeave state tracking
           className="w-full flex items-center justify-center gap-4 bg-white border-2 border-stone-200 text-stone-800 rounded-2xl p-4 font-black hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 transition-all active:scale-[0.98] shadow-sm group"
         >
-          <div
-            className={`transition-transform duration-300 ${isHovered ? "scale-110 rotate-12" : ""}`}
-          >
+          {/*  group-hover:scale-110 group-hover:rotate-12 directly to the element */}
+          <div className="transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12">
             <svg className="w-6 h-6" viewBox="0 0 24 24">
               <path
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
