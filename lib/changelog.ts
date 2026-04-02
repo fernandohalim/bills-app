@@ -2,6 +2,17 @@ import { Release } from "./types";
 
 export const releases: Release[] = [
   {
+    version: "1.2.3",
+    date: "apr 2, 2026",
+    title: "cleaning up 🧼",
+    badge: "patch",
+    badgeColor: "bg-teal-100 text-teal-700 border-teal-200",
+    features: [
+      "refine code-base structure",
+      "refine changelog ui, separate static imports.",
+    ],
+  },
+  {
     version: "1.2.2",
     date: "apr 2, 2026",
     title: "small changes 😊",
